@@ -6,6 +6,7 @@ description = "Input Map for Winit"
 license = "Apache or MIT"
 repository = "https://github.com/abss-witch/winit-input-map"
 readme = "README.md"
+keywords = ["winit", "input", "gamedev", "input"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
