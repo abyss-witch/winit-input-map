@@ -1,0 +1,18 @@
+[package]
+name = "winit-input-map"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+glium-types = { version = "0.1.0", optional = true }
+winit = "0.29.15"
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "example"
+
+[features]
+glium-types = ["dep:glium-types"]
