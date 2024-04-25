@@ -1,5 +1,5 @@
 #[cfg(feature = "glium-types")]
-use glium_generics::vec2::{vec2, Vec2};
+use glium_types::vectors::{vec2, Vec2};
 use winit::{dpi::PhysicalPosition, event::{ElementState, Event, KeyEvent, MouseButton, WindowEvent}, keyboard::{KeyCode, PhysicalKey}};
 /// input system. define actions and their key binds and then see if their pressing, pressed or released. get mouse position and how much its moved. you can use anythin that implements the `Into<usize>` trait as an action, but it's recommended to use an action enum.
 /// ```
