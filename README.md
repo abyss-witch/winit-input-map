@@ -1,5 +1,5 @@
 Input map for winit.
-```
+```rust
 fn main() {
     enum Actions {
         Debug,
