@@ -1,6 +1,6 @@
 [package]
 name = "winit-input-map"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Input Map for Winit"
 license = "Apache-2.0 OR MIT"
