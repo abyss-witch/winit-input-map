@@ -1,3 +1,2 @@
 mod input;
-pub use crate::input::{Input, axis, InputCode};
-
+pub use crate::input::{axis, Input, InputMap};
