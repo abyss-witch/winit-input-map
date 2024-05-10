@@ -1,6 +1,6 @@
 [package]
 name = "winit-input-map"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "Input Map for Winit"
 license = "Apache-2.0 OR MIT"
@@ -12,7 +12,7 @@ keywords = ["winit", "input", "gamedev", "input"]
 
 [dependencies]
 glium-types = { version = "0.2.0", optional = true }
-winit = "0.30.0"
+winit = "0.29.15"
 [lib]
 path = "src/lib.rs"
 

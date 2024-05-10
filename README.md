@@ -34,12 +34,10 @@ fn main() {
         (vec![Input::Mouse(MouseButton::Left)], Click),
     ]);
 
-    use winit::{event::*, keyboard::KeyCode, window::WindowAttributes};
+    use winit::{event::*, keyboard::KeyCode, window::Window};
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
-    let _window = event_loop
-        .create_window(WindowAttributes::default())
-        .unwrap();
+    let _window = Window::new(&event_loop).unwrap();
 
     event_loop
         .run(|event, target| {
@@ -77,3 +75,4 @@ fn main() {
 }
 ```
 Above example doesnt work on some platforms due to a lack of rendered graphics.
+Note that version 0.2.1 supports winit 0.30.0 while vesion 0.2.2 supports winit 0.29.15.
