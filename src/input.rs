@@ -2,7 +2,7 @@
 use glium_types::vectors::{vec2, Vec2};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
-    event::{ElementState, Event, KeyEvent, MouseButton, WindowEvent},
+    event::{DeviceEvent, ElementState, Event, KeyEvent, MouseButton, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
     window::Window,
 };
@@ -45,8 +45,8 @@ use winit::{
 ///             if input.released(Click) { println!("released {:?}", input.binds(Click)) }
 ///             
 ///             std::thread::sleep(std::time::Duration::from_millis(100));
-///             //since init is required to be called once before update, we put it at the end before it loops.
-///             input.init(); //could also use `init_hide_mouse()`
+///             //put at end of loop because were done with inputs this frame.
+///             input.init(;
 ///         }
 ///         _ => ()
 ///     }
@@ -110,14 +110,8 @@ impl<const BINDS: usize> InputMap<BINDS> {
             pressing: [false; BINDS],
             pressed: [false; BINDS],
             released: [false; BINDS],
-            #[cfg(feature = "glium-types")]
-            mouse_move: vec2(0.0, 0.0),
-            #[cfg(feature = "glium-types")]
-            mouse_pos: vec2(0.0, 0.0),
-            #[cfg(not(feature = "glium-types"))]
-            mouse_move: (0.0, 0.0),
-            #[cfg(not(feature = "glium-types"))]
-            mouse_pos: (0.0, 0.0),
+            mouse_move: v(0.0, 0.0),
+            mouse_pos: v(0.0, 0.0),
         }
     }
     /// updates the input using a winit event. requires `input.init()` to be used before being updated.
@@ -134,14 +128,14 @@ impl<const BINDS: usize> InputMap<BINDS> {
     ///     input.update(&event);
     ///     match &event{
     ///         Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => target.exit(),
-    ///         Event::AboutToWait => input.init(), //could also use `init_hide_mouse()`
+    ///         Event::AboutToWait => input.init(),
     ///         _ => ()
     ///     }
     /// });
     /// ```
     pub fn update(&mut self, event: &Event<()>) {
-        if let Event::WindowEvent { event, .. } = event {
-            match event {
+        match event {
+            Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CursorMoved { position, .. } => {
                     self.update_mouse(*position);
                 }
@@ -150,42 +144,14 @@ impl<const BINDS: usize> InputMap<BINDS> {
                 }
                 WindowEvent::KeyboardInput { event, .. } => self.update_keys(event),
                 _ => (),
-            }
+            },
+            Event::DeviceEvent { event, .. } => match event {
+                DeviceEvent::MouseMotion { delta } => self.update_mouse_move(*delta),
+                _ => (),
+            },
+            _ => (),
         }
     }
-    /// hides and centres mouse. usefull for camera controls, use instead of `input.init()`
-    /// required to put `input.init()` before `input.update()`
-    /// ```no_run
-    /// use winit::{event::*, window::WindowAttribures};
-    /// use input::InputMap;
-    ///
-    /// let mut event_loop = winit::event_loop::EventLoopBuilder::new().build().unwrap();
-    /// event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
-    /// let mut window = event_loop.create_window(WindowAttribures::default());
-    /// let mut input = InputMap::new([]);
-    ///
-    /// event_loop.run(|event, target|{
-    ///     input.update(&event);
-    ///     match &event{
-    ///         Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => target.exit(),
-    ///         Event::AboutToWait => input.init_hide_mouse(&mut window),
-    ///         _ => ()
-    ///     }
-    /// });
-    /// ```
-    pub fn init_hide_mouse(&mut self, window: &mut Window) {
-        let PhysicalSize { width, height } = window.inner_size();
-        self.mouse_pos = v(width as f32 / 2.0, height as f32 / 2.0);
-        self.init();
-        if window.has_focus() {
-            window.set_cursor_visible(false);
-            let _ = window.set_cursor_position(PhysicalPosition::new(
-                width as f64 / 2.0,
-                height as f64 / 2.0,
-            ));
-        };
-    }
-
     /// initialise input. required to be called for `mouse_move`, `pressed()` and `released()` to work.
     /// required to put `input.init()` before `input.update()`
     /// ```no_run
@@ -212,20 +178,12 @@ impl<const BINDS: usize> InputMap<BINDS> {
         self.released = [false; BINDS];
     }
     ///you should use `self.update()` instead
-    #[cfg(feature = "glium-types")]
     fn update_mouse(&mut self, position: PhysicalPosition<f64>) {
-        let (x, y) = (position.x, position.y);
-        let current = vec2(x as f32, y as f32);
-        self.mouse_move = current - self.mouse_pos;
-        self.mouse_pos = current;
+        self.mouse_pos = v(position.x as f32, position.y as f32);
     }
-    ///you should use `self.update()` instead
-    #[cfg(not(feature = "glium-types"))]
-    fn update_mouse(&mut self, position: PhysicalPosition<f64>) {
-        let (x, y) = (position.x, position.y);
-        let current = (x as f32, y as f32);
-        self.mouse_move = (current.0 - self.mouse_pos.0, current.1 - self.mouse_pos.1);
-        self.mouse_pos = current;
+
+    fn update_mouse_move(&mut self, delta: (f64, f64)) {
+        self.mouse_move = v(delta.0 as f32, delta.1 as f32);
     }
     ///you should use `self.update()` instead
     fn update_keys(&mut self, event: &KeyEvent) {

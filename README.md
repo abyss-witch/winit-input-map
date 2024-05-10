@@ -65,8 +65,8 @@ fn main() {
                     }
 
                     std::thread::sleep(std::time::Duration::from_millis(100));
-                    //since init is required to be called once before update, we put it at the end before it loops.
-                    input.init(); //could use `init_hide_mouse()` instead. good for camera controls.
+                    // put at end of the loop because were done with inputs this frame.
+                    input.init();
                 }
                 _ => (),
             }
@@ -75,4 +75,3 @@ fn main() {
 }
 ```
 Above example doesnt work on some platforms due to a lack of rendered graphics.
-Note that version 0.2.1 supports winit 0.30.0 while vesion 0.2.2 supports winit 0.29.15.
