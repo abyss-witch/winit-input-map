@@ -442,9 +442,9 @@ dependencies = [
 
 [[package]]
 name = "glium-types"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c62c170876394091f81dc6aa76b9b82c008117c44d62746b814de821a853c57f"
+checksum = "b63c1615f7c1bd1b0f8222b02b8050e6be5e009206eb5fcf56663cfd30fc2954"
 dependencies = [
  "derive-cmp-ops",
  "glium",
@@ -1595,7 +1595,7 @@ dependencies = [
 
 [[package]]
 name = "winit-input-map"
-version = "0.2.2"
+version = "0.2.4"
 dependencies = [
  "glium-types",
  "winit",

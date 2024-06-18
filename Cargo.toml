@@ -1,6 +1,6 @@
 [package]
 name = "winit-input-map"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 description = "Input Map for Winit"
 license = "Apache-2.0 OR MIT"
@@ -11,7 +11,7 @@ keywords = ["winit", "input", "gamedev", "input"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-glium-types = { version = "0.2.0", optional = true }
+glium-types = { version = "0.3.0", optional = true }
 winit = "0.29.15"
 [lib]
 path = "src/lib.rs"

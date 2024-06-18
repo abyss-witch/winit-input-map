@@ -1,10 +1,9 @@
 #[cfg(feature = "glium-types")]
 use glium_types::vectors::{vec2, Vec2};
 use winit::{
-    dpi::{PhysicalPosition, PhysicalSize},
-    event::{DeviceEvent, ElementState, Event, KeyEvent, MouseButton, WindowEvent},
-    keyboard::{KeyCode, PhysicalKey},
-    window::Window,
+    dpi::PhysicalPosition,
+    event::*,
+    keyboard::{KeyCode, PhysicalKey}
 };
 /// input system. define actions and their key binds and then see if their pressing, pressed or released. get mouse position and how much its moved. you can use anythin that implements the `Into<usize>` trait as an action, but it's recommended to use an action enum.
 /// ```
@@ -57,6 +56,8 @@ pub struct InputMap<const BINDS: usize> {
     pub pressing: [bool; BINDS],
     pub pressed: [bool; BINDS],
     pub released: [bool; BINDS],
+    /// the amount the scroll wheel has changed
+    pub mouse_scroll: f32,
     #[cfg(feature = "glium-types")]
     pub mouse_move: Vec2,
     #[cfg(not(feature = "glium-types"))]
@@ -110,6 +111,7 @@ impl<const BINDS: usize> InputMap<BINDS> {
             pressing: [false; BINDS],
             pressed: [false; BINDS],
             released: [false; BINDS],
+            mouse_scroll: 0.0,
             mouse_move: v(0.0, 0.0),
             mouse_pos: v(0.0, 0.0),
         }
@@ -147,6 +149,10 @@ impl<const BINDS: usize> InputMap<BINDS> {
             },
             Event::DeviceEvent { event, .. } => match event {
                 DeviceEvent::MouseMotion { delta } => self.update_mouse_move(*delta),
+                DeviceEvent::MouseWheel { delta } => self.mouse_scroll += match delta {
+                    MouseScrollDelta::LineDelta(_, change) => *change,
+                    MouseScrollDelta::PixelDelta(PhysicalPosition { y: change, .. }) => *change as f32
+                },
                 _ => (),
             },
             _ => (),
@@ -176,6 +182,7 @@ impl<const BINDS: usize> InputMap<BINDS> {
         self.mouse_move = v(0.0, 0.0);
         self.pressed = [false; BINDS];
         self.released = [false; BINDS];
+        self.mouse_scroll = 0.0;
     }
     ///you should use `self.update()` instead
     fn update_mouse(&mut self, position: PhysicalPosition<f64>) {
@@ -221,7 +228,9 @@ impl<const BINDS: usize> InputMap<BINDS> {
     pub fn released(&self, action: impl Into<usize>) -> bool {
         self.released[action.into()]
     }
-    /// returns 1.0 if pos is pressed, -1.0 if neg is pressed or 0.0 if either pos and neg or nothing is pressed. usefull for movement controls. same as `input::axis(input.pressing(pos), input.pressing(neg))`
+    /// returns 1.0 if pos is pressed, -1.0 if neg is pressed or 0.0 if either pos and neg
+    /// or nothing is pressed. usefull for movement controls. same as `input::axis(input.pressing(pos),
+    /// input.pressing(neg))`
     /// ```no_run
     /// let move_dir = (input.axis(Right, Left), input.axis(Up, Down));
     /// ```
