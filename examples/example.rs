@@ -1,36 +1,26 @@
 fn main() {
+    #[derive(ToUsize)]
     enum Actions {
         Debug,
         Left,
         Right,
         Click,
     }
-    impl Into<usize> for Actions {
-        fn into(self) -> usize {
-            self as usize
-        }
-    }
     use winit_input_map::*;
     use Actions::*;
 
-    let mut input = InputMap::new([
-        (vec![Input::keycode(KeyCode::Space)], Debug),
-        (vec![
-            Input::keycode(KeyCode::ArrowLeft),
-            Input::keycode(KeyCode::KeyA),
-        ], Left),
-        (vec![
-            Input::keycode(KeyCode::ArrowRight),
-            Input::keycode(KeyCode::KeyD),
-        ], Right),
-        (vec![Input::Mouse(MouseButton::Left)], Click),
-    ]);
+    let mut input = input_map!(
+        (Debug, KeyCode::Space),
+        (Left,  KeyCode::ArrowLeft, KeyCode::KeyA),
+        (Right, KeyCode::ArrowRight, KeyCode::KeyD),
+        (Click, MouseButton::Left)
+    );
 
     use winit::{event::*, keyboard::KeyCode, window::Window};
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     let _window = Window::new(&event_loop).unwrap();
-
+    
     event_loop.run(|event, target| {
         input.update(&event);
         match &event {

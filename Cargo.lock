@@ -314,6 +314,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive-to-usize"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7161a483695f3cdb2881f1eddfd155093c5b8be8b10d97dda5dc61a461061f3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -442,9 +453,9 @@ dependencies = [
 
 [[package]]
 name = "glium-types"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b63c1615f7c1bd1b0f8222b02b8050e6be5e009206eb5fcf56663cfd30fc2954"
+checksum = "22b0844941727ab182ae62a093803d626c49772db1d21ef1d574c0aa913caffb"
 dependencies = [
  "derive-cmp-ops",
  "glium",
@@ -823,9 +834,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.81"
+version = "1.0.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d1597b0c024618f09a9c3b8655b7e430397a36d23fdafec26d6965e9eec3eba"
+checksum = "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
 dependencies = [
  "unicode-ident",
 ]
@@ -1002,9 +1013,9 @@ checksum = "6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731"
 
 [[package]]
 name = "syn"
-version = "2.0.60"
+version = "2.0.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "909518bc7b1c9b779f1bbf07f2929d35af9f0f37e47c6e9ef7f9dddc1e1821f3"
+checksum = "901fa70d88b9d6c98022e23b4136f9f3e54e4662c3bc1bd1d84a42a9a0f0c1e9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1597,6 +1608,7 @@ dependencies = [
 name = "winit-input-map"
 version = "0.2.4"
 dependencies = [
+ "derive-to-usize",
  "glium-types",
  "winit",
 ]
