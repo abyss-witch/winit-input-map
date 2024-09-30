@@ -1,17 +1,18 @@
 [package]
 name = "winit-input-map"
-version = "0.2.5"
+version = "0.3.0"
 edition = "2021"
 description = "Input Map for Winit"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/abss-witch/winit-input-map"
 readme = "README.md"
-keywords = ["winit", "input", "gamedev"]
+keywords = ["winit", "input", "gamedev", "gamepad"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 derive-to-usize = "0.1.0"
+gilrs = { version = "0.11.0", optional = true }
 glium-types = { version = "0.3.1", optional = true }
 winit = "0.29.15"
 [lib]
@@ -21,4 +22,6 @@ path = "src/lib.rs"
 name = "example"
 
 [features]
+default = ["gamepad"]
 glium-types = ["dep:glium-types"]
+gamepad = ["dep:gilrs"]

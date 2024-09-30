@@ -126,7 +126,7 @@ impl<const BINDS: usize> InputMap<BINDS> {
             released: []
         }
     }
-    /// updates the input map using a winit event. make sure to call `input.init()` when your done with
+    /// updates the input using a winit event. make sure to call `input.init()` when your done with
     /// the input this loop.
     /// ```no_run
     /// use winit::{event::*, window::Window, event_loop::EventLoop};
@@ -147,7 +147,7 @@ impl<const BINDS: usize> InputMap<BINDS> {
     ///     }
     /// });
     /// ```
-    pub fn update_with_winit(&mut self, event: &Event<()>) {
+    pub fn update(&mut self, event: &Event<()>) {
         match event {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CursorMoved { position, .. } => {
@@ -168,14 +168,6 @@ impl<const BINDS: usize> InputMap<BINDS> {
                 _ => (),
             },
             _ => (),
-        }
-    }
-    #[cfg(feature = "gamepad")]
-    /// updates the input maps gamepads using gilrs. make sure to call `input.init()` when your done with
-    /// the input this loop.
-    pub fn update_with_gilrs(&mut self, gilrs: &mut gilrs::Gilrs) {
-        while let Some(ev) = gilrs.next_event() {
-            self.update_gamepad(ev);
         }
     }
     /// initialise input. use when your done with input this loop. required to be called for 
@@ -218,21 +210,29 @@ impl<const BINDS: usize> InputMap<BINDS> {
     /// you should use `self.update()` instead
     fn update_keys(&mut self, event: &KeyEvent) {
         let input_code = Input::Key(event.physical_key);
+        self.other_pressed = Some(input_code);
 
         if let (Some(string), Some(new)) = (&mut self.text_typed, &event.text) {
             string.push_str(new);
         } else { self.text_typed = event.text.as_ref().map(|i| i.to_string()) }
 
-        self.update_val(input_code, event.state.is_pressed());
+        for (i, key) in self.binds.iter().enumerate() {
+            if key.contains(&input_code) {
+                self.pressed[i] = event.state.is_pressed() && !self.pressing[i];
+                self.released[i] = !event.state.is_pressed() && self.pressing[i];
+                self.pressing[i] = event.state.is_pressed();
+            }
+        }
     }
     /// you should use `self.update()` instead
     fn update_buttons(&mut self, state: &ElementState, button: MouseButton) {
         let input_code = Input::Mouse(button);
+        self.other_pressed = Some(input_code);
         self.update_val(input_code, state.is_pressed());
     }
-    /// updates provided input code
+    /// updates based off of provided input code and bool, where true means just pressed and false
+    /// means *just* released
     fn update_val(&mut self, input_code: Input, pressed: bool) {
-        if pressed { self.other_pressed = Some(input_code) }
         for (i, key) in self.binds.iter().enumerate() {
             if key.contains(&input_code) {
                 self.pressed[i] = pressed && !self.pressing[i];
@@ -247,6 +247,8 @@ impl<const BINDS: usize> InputMap<BINDS> {
         let id = SpecifyGamepad::Id(id);
 
         use gilrs::ev::EventType;
+        let mut pressed = false;
+        let mut released = false;
         match event {
             EventType::ButtonPressed(b, _) => {
                 let input = GamepadInput::Button(b);
@@ -324,40 +326,29 @@ impl From<MouseButton> for Input {
         Self::Mouse(value)
     }
 }
+
+#[cfg(feature = "gamepad")] 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum GamepadInput {
+    Button(gilrs::ev::Button),
+    Axis(gilrs::ev::Axis, Direction)
+}
 #[cfg(feature = "gamepad")]
-pub use gamepad::*;
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Direction {
+    Left,
+    Right
+}
+/// specify gamepad
 #[cfg(feature = "gamepad")]
-mod gamepad {
-    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-    pub enum GamepadInput {
-        Button(gilrs::ev::Button),
-        Axis(gilrs::ev::Axis, Direction)
-    }
-    impl From<GamepadInput> for crate::Input {
-        fn from(value: GamepadInput) -> crate::Input {
-            Self::Gamepad { input: value, id: Default::default() }
-        }
-    }
-    impl From<gilrs::Button> for crate::Input {
-        fn from(value: gilrs::Button) -> crate::Input {
-            Self::Gamepad { input: GamepadInput::Button(value), id: Default::default() }
-        }
-    }
-    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-    pub enum Direction {
-        Left,
-        Right
-    }
-    /// specify gamepad to use
-    #[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
-    pub enum SpecifyGamepad {
-        /// cant be set at compile time. use `Any` as default and then let the user select a specific
-        /// gamepad
-        Id(gilrs::GamepadId),
-        /// use as default
-        #[default]
-        Any
-    }
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
+pub enum SpecifyGamepad {
+    /// cant be set at compile time. use `Any` as default and then let the user select a specific
+    /// gamepad
+    Id(gilrs::GamepadId),
+    /// use as default
+    #[default]
+    Any
 }
 #[cfg(not(feature = "glium-types"))]
 type Vec2 = (f32, f32);

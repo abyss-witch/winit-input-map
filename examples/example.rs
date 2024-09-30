@@ -8,26 +8,29 @@ fn main() {
     }
     use winit_input_map::*;
     use Actions::*;
+    use gilrs::{Gilrs, Button, ev::Axis};
+    use winit::{event::*, keyboard::KeyCode, window::Window};
 
     let mut input = input_map!(
-        (Debug, KeyCode::Space),
-        (Left,  KeyCode::ArrowLeft, KeyCode::KeyA),
-        (Right, KeyCode::ArrowRight, KeyCode::KeyD),
+        (Debug, KeyCode::Space, Button::South),
+        (Left,  KeyCode::ArrowLeft, KeyCode::KeyA, GamepadInput::Axis(Axis::LeftStickX, Direction::Left)),
+        (Right, KeyCode::ArrowRight, KeyCode::KeyD, GamepadInput::Axis(Axis::LeftStickX, Direction::Right)),
         (Click, MouseButton::Left)
     );
-
-    use winit::{event::*, keyboard::KeyCode, window::Window};
+    
+    let mut gilrs = Gilrs::new().unwrap();
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     let _window = Window::new(&event_loop).unwrap();
     
     event_loop.run(|event, target| {
-        input.update(&event);
+        input.update_with_winit(&event);
         match &event {
             Event::WindowEvent { 
                 event: WindowEvent::CloseRequested, ..
             } => target.exit(),
             Event::AboutToWait => {
+                input.update_with_gilrs(&mut gilrs);
                 if input.pressed(Debug) {
                     println!("pressed {:?}", input.binds(Debug))
                 }
@@ -46,7 +49,11 @@ fn main() {
                 if input.mouse_scroll != 0.0 {
                     println!("scrolling {}", input.mouse_scroll);
                 }
-               std::thread::sleep(std::time::Duration::from_millis(100));
+
+                if let Some(other) = input.other_pressed {
+                    println!("{other:?}");
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
                 //reset input. use after your done with the input
                 input.init();
             }

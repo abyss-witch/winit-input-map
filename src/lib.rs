@@ -66,3 +66,5 @@ macro_rules! input_map {
         )*])
     };
 }
+#[cfg(test)]
+mod test;
