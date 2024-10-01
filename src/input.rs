@@ -3,53 +3,32 @@ use winit::{
     event::*,
     keyboard::{KeyCode, PhysicalKey}
 };
-/// you can use anything that implements the `Into<usize>` trait as an action, but it's recommended 
-/// to use an action enum which derives `ToUsize`. `input_map!` macro reduces the boilerplate of
-/// this function
+/// A struct that handles all your input needs once you've hooked it up to winit and gilrs.
 /// ```
-/// #[derive(ToUsize)] // could also manualy implement Into<usize>
-/// enum Actions{
-///     Debug,
-///     Left,
-///     Right,
-///     Click
+/// struct App<const BINDS: usize> {
+///     window: Option<Window>,
+///     input: InputMap<BINDS>,
+///     gilrs: Gilrs
 /// }
-/// use winit::{event::*, keyboard::KeyCode, event_loop::*, window::Window};
-/// use winit_input_map::*;
-/// use Actions::*;
-///
-/// let mut input = InputMap::new([ // doesnt have to be in the same order as the enum
-///     (Debug, vec![Input::keycode(KeyCode::Space)]),
-///     (Click, vec![Input::Mouse(MouseButton::Left)]),
-///     (Left,  vec![Input::keycode(KeyCode::ArrowLeft), Input::keycode(KeyCode::KeyA)]),
-///     (Right, vec![Input::keycode(KeyCode::ArrowRight), Input::keycode(KeyCode::KeyD)]),
-/// ]);
-/// 
-/// let event_loop = EventLoop::new().unwrap();
-/// event_loop.set_control_flow(ControlFlow::Poll);
-/// let _window = Window::new(&event_loop).unwrap();
-///
-/// event_loop.run(|event, target|{
-///     input.update(&event);
-///     match &event {
-///         Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => { target.exit() },
-///         Event::AboutToWait => {
-///             if input.pressed(Debug) { println!("pressed {:?}", input.binds(Debug)) }
-///             if input.pressing(Right) || input.pressing(Left) { 
-///                 println!("axis: {}", input.axis(Right, Left)) 
-///             }
-///             if input.mouse_move != (0.0, 0.0) {
-///                 println!("mouse moved: {:?} and is now at {:?}", input.mouse_move, input.mouse_pos)
-///             }
-///             if input.released(Click) { println!("released {:?}", input.binds(Click)) }
-///             
-///             std::thread::sleep(std::time::Duration::from_millis(100));
-///             //put at end of loop because were done with inputs this loop.
-///             input.init();
-///         }
-///         _ => ()
+/// impl<const BINDS: usize> ApplicationHandler for App<BINDS> {
+///     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+///         self.window = Some(event_loop.create_window(Window::default_attributes()).unwrap());
 ///     }
-/// }).unwrap();
+///     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
+///         self.input.update_with_window_event(&event);
+///         if let WindowEvent::CloseRequested = &event { event_loop.exit() }
+///     }
+///     fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
+///         self.input.update_with_device_event(&event);
+///     }
+///     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
+///         self.input.update_with_gilrs(&mut self.gilrs);
+/// 
+///         // put your code here
+///
+///         self.input.init();
+///     }
+/// }
 /// ```
 pub struct InputMap<const BINDS: usize> {
     pub binds: [Vec<Input>; BINDS],
@@ -67,10 +46,10 @@ pub struct InputMap<const BINDS: usize> {
 }
 impl<const BINDS: usize> InputMap<BINDS> {
     /// create new input system. recommended to use an action enum which implements the 
-    /// `Into<usize>` trait. the `input_map!` macro reduces boilerplate.
+    /// `Into<usize>` trait. using the `input_map!` macro to reduce boilerplate is recommended.
     /// ```
     /// use Action::*;
-    /// use input::*;
+    /// use winit_input_map::*;
     /// use winit::keyboard::KeyCode;
     /// #[derive(ToUsize)]
     /// enum Action {
@@ -112,7 +91,7 @@ impl<const BINDS: usize> InputMap<BINDS> {
             text_typed:    None
         }
     }
-    /// use if you dont want to have any action. will still have access to everythin else
+    /// use if you dont want to have any actions and binds. will still have access to everything else.
     pub fn empty() -> InputMap<0> {
         InputMap {
             mouse_scroll: 0.0,
@@ -147,9 +126,26 @@ impl<const BINDS: usize> InputMap<BINDS> {
     ///     }
     /// });
     /// ```
+    #[deprecated = "use `update_with_window_event` and `update_with_device_event`"]
     pub fn update_with_winit(&mut self, event: &Event<()>) {
         match event {
-            Event::WindowEvent { event, .. } => match event {
+            Event::WindowEvent { event, .. } => self.update_with_window_event(event),
+            Event::DeviceEvent { event, .. } => self.update_with_device_event(event),
+            _ => ()
+        }
+    }
+    pub fn update_with_device_event(&mut self, event: &DeviceEvent) {
+        match event {
+            DeviceEvent::MouseMotion { delta } => self.update_mouse_move(*delta),
+            DeviceEvent::MouseWheel { delta } => self.mouse_scroll += match delta {
+                MouseScrollDelta::LineDelta(_, change) => *change,
+                MouseScrollDelta::PixelDelta(PhysicalPosition { y: change, .. }) => *change as f32
+            },
+             _ => (),
+        }
+    }
+    pub fn update_with_window_event(&mut self, event: &WindowEvent) {
+        match event {
                 WindowEvent::CursorMoved { position, .. } => {
                     self.update_mouse(*position);
                 }
@@ -157,48 +153,16 @@ impl<const BINDS: usize> InputMap<BINDS> {
                     self.update_buttons(state, *button)
                 }
                 WindowEvent::KeyboardInput { event, .. } => self.update_keys(event),
-                _ => (),
-            },
-            Event::DeviceEvent { event, .. } => match event {
-                DeviceEvent::MouseMotion { delta } => self.update_mouse_move(*delta),
-                DeviceEvent::MouseWheel { delta } => self.mouse_scroll += match delta {
-                    MouseScrollDelta::LineDelta(_, change) => *change,
-                    MouseScrollDelta::PixelDelta(PhysicalPosition { y: change, .. }) => *change as f32
-                },
-                _ => (),
-            },
-            _ => (),
+                _ => ()
         }
     }
     #[cfg(feature = "gamepad")]
-    /// updates the input maps gamepads using gilrs. make sure to call `input.init()` when your done with
-    /// the input this loop.
     pub fn update_with_gilrs(&mut self, gilrs: &mut gilrs::Gilrs) {
         while let Some(ev) = gilrs.next_event() {
             self.update_gamepad(ev);
         }
     }
-    /// initialise input. use when your done with input this loop. required to be called for 
-    /// everything except `pressing` and `mouse_pos` to work properly.
-    /// ```no_run
-    /// use winit::{event::*, window::Window, event_loop::EventLoop};
-    /// use winit_input_map::InputMap;
-    ///
-    /// let mut event_loop = EventLoop::new().unwrap();
-    /// event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
-    /// let _window = Window::new(&event_loop).unwrap();
-    ///
-    /// let mut input = input_map!();
-    ///
-    /// event_loop.run(|event, target| {
-    ///     input.update(&event);
-    ///     match &event{
-    ///         Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => target.exit(),
-    ///         Event::AboutToWait => input.init(),
-    ///         _ => ()
-    ///     }
-    /// });
-    /// ```
+    /// makes the input map ready to recieve new events.
     pub fn init(&mut self) {
         self.mouse_move = v(0.0, 0.0);
         self.pressed = [false; BINDS];
@@ -207,15 +171,12 @@ impl<const BINDS: usize> InputMap<BINDS> {
         self.text_typed    = None;
         self.other_pressed = None;
     }
-    /// you should use `self.update()` instead
     fn update_mouse(&mut self, position: PhysicalPosition<f64>) {
         self.mouse_pos = v(position.x as f32, position.y as f32);
     }
-
     fn update_mouse_move(&mut self, delta: (f64, f64)) {
         self.mouse_move = v(delta.0 as f32, delta.1 as f32);
     }
-    /// you should use `self.update()` instead
     fn update_keys(&mut self, event: &KeyEvent) {
         let input_code = Input::Key(event.physical_key);
 
@@ -225,7 +186,6 @@ impl<const BINDS: usize> InputMap<BINDS> {
 
         self.update_val(input_code, event.state.is_pressed());
     }
-    /// you should use `self.update()` instead
     fn update_buttons(&mut self, state: &ElementState, button: MouseButton) {
         let input_code = Input::Mouse(button);
         self.update_val(input_code, state.is_pressed());

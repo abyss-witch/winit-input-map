@@ -1,19 +1,14 @@
 use winit_input_map::*;
 use gilrs::Gilrs;
-use winit::{event::*, application::*, window::*, event_loop::*, keyboard::KeyCode};
-
-#[derive(ToUsize)]
-enum Action { Return }
-
+use winit::{event::*, application::*, window::*, event_loop::*};
 fn main() {
-    let input = input_map!((Action::Return, KeyCode::Enter));
+    let input = input_map!();
     
     let gilrs = Gilrs::new().unwrap();
     let event_loop = EventLoop::new().unwrap();
-    event_loop.run_app(&mut App { window: None, input, gilrs, text: String::new() }).unwrap();
+    event_loop.run_app(&mut App { window: None, input, gilrs }).unwrap();
 }
-
-struct App<const BINDS: usize> { window: Option<Window>, input: InputMap<BINDS>, gilrs: Gilrs, text: String }
+struct App<const BINDS: usize> { window: Option<Window>, input: InputMap<BINDS>, gilrs: Gilrs }
 impl<const BINDS: usize> ApplicationHandler for App<BINDS> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.window = Some(event_loop.create_window(Window::default_attributes()).unwrap());
@@ -28,13 +23,9 @@ impl<const BINDS: usize> ApplicationHandler for App<BINDS> {
     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
         self.input.update_with_gilrs(&mut self.gilrs);
 
-        if self.input.pressed(Action::Return) {
-            println!("{}", self.text);
-            self.text = String::new();
-        } else if let Some(new) = &self.input.text_typed {
-            self.text.push_str(new);
-        }
+        // put your code here
 
         self.input.init();
     }
 }
+
