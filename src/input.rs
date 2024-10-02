@@ -32,17 +32,17 @@ use winit::{
 /// ```
 pub struct InputMap<const BINDS: usize> {
     pub binds: [Vec<Input>; BINDS],
-    pub pressing: [bool; BINDS],
+    pub press_val: [f32; BINDS],
     pub pressed:  [bool; BINDS],
     pub released: [bool; BINDS],
     /// the amount the scroll wheel has changed
-    pub mouse_scroll: f32,
-    pub mouse_move: Vec2,
     pub mouse_pos: Vec2,
     /// last input even if it isnt in the binds. useful for rebinding.
     pub other_pressed: Option<Input>,
     /// the text typed this loop. useful for typing
-    pub text_typed: Option<String>
+    pub text_typed: Option<String>,
+    pub mouse_scale: f32,
+    pub scroll_scale: f32
 }
 impl<const BINDS: usize> InputMap<BINDS> {
     /// create new input system. recommended to use an action enum which implements the 
@@ -55,15 +55,15 @@ impl<const BINDS: usize> InputMap<BINDS> {
     /// enum Action {
     ///     Forward,
     ///     Back,
-    ///     Left,
-    ///     Right
+    ///     Pos,
+    ///     Neg
     /// }
     /// //doesnt have to be the same ordered as the enum.
     /// let mut input = Input::new([
     ///     (vec![Input::keycode(KeyCode::KeyW)], Forward),
-    ///     (vec![Input::keycode(KeyCode::KeyA)], Left),
+    ///     (vec![Input::keycode(KeyCode::KeyA)], Pos),
     ///     (vec![Input::keycode(KeyCode::KeyS)], Back),
-    ///     (vec![Input::keycode(KeyCode::KeyD)], Right)
+    ///     (vec![Input::keycode(KeyCode::KeyD)], Neg)
     /// ]);
     /// ```
     pub fn new(binds: [(impl Into<usize>, Vec<Input>); BINDS]) -> Self {
@@ -80,12 +80,12 @@ impl<const BINDS: usize> InputMap<BINDS> {
             temp_binds[i] = binds;
         }
         Self {
+            mouse_scale: 0.1,
+            scroll_scale: 0.1,
             binds: temp_binds,
-            pressing: [false; BINDS],
+            press_val: [0.0; BINDS],
             pressed:  [false; BINDS],
             released: [false; BINDS],
-            mouse_scroll: 0.0,
-            mouse_move: v(0.0, 0.0),
             mouse_pos:  v(0.0, 0.0),
             other_pressed: None,
             text_typed:    None
@@ -94,13 +94,13 @@ impl<const BINDS: usize> InputMap<BINDS> {
     /// use if you dont want to have any actions and binds. will still have access to everything else.
     pub fn empty() -> InputMap<0> {
         InputMap {
-            mouse_scroll: 0.0,
-            mouse_move: v(0.0, 0.0),
+            mouse_scale: 0.1,
+            scroll_scale: 0.1,
             mouse_pos:  v(0.0, 0.0),
             other_pressed: None,
             text_typed:    None,
             binds:    [],
-            pressing: [],
+            press_val: [],
             pressed:  [],
             released: []
         }
@@ -136,24 +136,35 @@ impl<const BINDS: usize> InputMap<BINDS> {
     }
     pub fn update_with_device_event(&mut self, event: &DeviceEvent) {
         match event {
-            DeviceEvent::MouseMotion { delta } => self.update_mouse_move(*delta),
-            DeviceEvent::MouseWheel { delta } => self.mouse_scroll += match delta {
-                MouseScrollDelta::LineDelta(_, change) => *change,
-                MouseScrollDelta::PixelDelta(PhysicalPosition { y: change, .. }) => *change as f32
+            DeviceEvent::MouseMotion { delta } => {
+                let x = delta.0 as f32 * self.mouse_scale;
+                let y = delta.0 as f32 * self.mouse_scale;
+                self.update_val(Input::MouseMoveX(AxisSign::Pos), x.max(0.0));
+                self.update_val(Input::MouseMoveX(AxisSign::Neg), (-x).max(0.0));
+                self.update_val(Input::MouseMoveY(AxisSign::Pos), y.max(0.0));
+                self.update_val(Input::MouseMoveY(AxisSign::Neg), (-y).max(0.0));
+            },
+            DeviceEvent::MouseWheel { delta } => {
+                let change = match delta {
+                    MouseScrollDelta::LineDelta(_, change) => *change,
+                    MouseScrollDelta::PixelDelta(PhysicalPosition { y: change, .. }) => *change as f32
+                } * self.scroll_scale;
+                self.update_val(Input::MouseScroll(AxisSign::Pos), change.max(0.0));
+                self.update_val(Input::MouseScroll(AxisSign::Neg), (-change).max(0.0));
             },
              _ => (),
         }
     }
     pub fn update_with_window_event(&mut self, event: &WindowEvent) {
         match event {
-                WindowEvent::CursorMoved { position, .. } => {
-                    self.update_mouse(*position);
-                }
-                WindowEvent::MouseInput { state, button, .. } => {
-                    self.update_buttons(state, *button)
-                }
-                WindowEvent::KeyboardInput { event, .. } => self.update_keys(event),
-                _ => ()
+            WindowEvent::CursorMoved { position, .. } => {
+                self.update_mouse(*position);
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                self.update_buttons(state, *button)
+            }
+            WindowEvent::KeyboardInput { event, .. } => self.update_keys(event),
+            _ => ()
         }
     }
     #[cfg(feature = "gamepad")]
@@ -164,18 +175,19 @@ impl<const BINDS: usize> InputMap<BINDS> {
     }
     /// makes the input map ready to recieve new events.
     pub fn init(&mut self) {
-        self.mouse_move = v(0.0, 0.0);
-        self.pressed = [false; BINDS];
+        self.update_val(Input::MouseMoveX(AxisSign::Pos), 0.0);
+        self.update_val(Input::MouseMoveX(AxisSign::Neg), 0.0);
+        self.update_val(Input::MouseMoveY(AxisSign::Pos), 0.0);
+        self.update_val(Input::MouseMoveY(AxisSign::Neg), 0.0);
+        self.update_val(Input::MouseScroll(AxisSign::Pos), 0.0);
+        self.update_val(Input::MouseScroll(AxisSign::Neg), 0.0);
+        self.pressed  = [false; BINDS];
         self.released = [false; BINDS];
-        self.mouse_scroll  = 0.0;
         self.text_typed    = None;
         self.other_pressed = None;
     }
     fn update_mouse(&mut self, position: PhysicalPosition<f64>) {
         self.mouse_pos = v(position.x as f32, position.y as f32);
-    }
-    fn update_mouse_move(&mut self, delta: (f64, f64)) {
-        self.mouse_move = v(delta.0 as f32, delta.1 as f32);
     }
     fn update_keys(&mut self, event: &KeyEvent) {
         let input_code = Input::Key(event.physical_key);
@@ -184,20 +196,21 @@ impl<const BINDS: usize> InputMap<BINDS> {
             string.push_str(new);
         } else { self.text_typed = event.text.as_ref().map(|i| i.to_string()) }
 
-        self.update_val(input_code, event.state.is_pressed());
+        self.update_val(input_code, event.state.is_pressed() as u8 as f32);
     }
     fn update_buttons(&mut self, state: &ElementState, button: MouseButton) {
         let input_code = Input::Mouse(button);
-        self.update_val(input_code, state.is_pressed());
+        self.update_val(input_code, state.is_pressed() as u8 as f32);
     }
     /// updates provided input code
-    fn update_val(&mut self, input_code: Input, pressed: bool) {
+    fn update_val(&mut self, input_code: Input, val: f32) {
+        let pressed = val != 0.0;
         if pressed { self.other_pressed = Some(input_code) }
         for (i, key) in self.binds.iter().enumerate() {
             if key.contains(&input_code) {
-                self.pressed[i] = pressed && !self.pressing[i];
-                self.released[i] = !pressed && self.pressing[i];
-                self.pressing[i] = pressed;
+                self.pressed[i] = pressed && !self.pressing(i);
+                self.released[i] = !pressed && self.pressing(i);
+                self.press_val[i] = val;
             }
         }
     }
@@ -210,24 +223,27 @@ impl<const BINDS: usize> InputMap<BINDS> {
         match event {
             EventType::ButtonPressed(b, _) => {
                 let input = GamepadInput::Button(b);
-                self.update_val(Input::Gamepad { id, input }, true);
-                self.update_val(Input::Gamepad { id: SpecifyGamepad::Any, input }, true);
+                self.update_val(Input::Gamepad { id, input }, 1.0);
+                self.update_val(Input::Gamepad { id: SpecifyGamepad::Any, input }, 1.0);
             },
             EventType::ButtonReleased(b, _) => {
                 let input = GamepadInput::Button(b);
-                self.update_val(Input::Gamepad { id, input }, false);
-                self.update_val(Input::Gamepad { id: SpecifyGamepad::Any, input }, false);
+                self.update_val(Input::Gamepad { id, input }, 0.0);
+                self.update_val(Input::Gamepad { id: SpecifyGamepad::Any, input }, 0.0);
+            },
+            EventType::ButtonChanged(b, v, _) => {
+                self.update_val(Input::Gamepad { id, input: b.into() }, v);
             },
             EventType::AxisChanged(b, v, _) => {
                 use GamepadInput::Axis;
-                use Direction::*;
-                let dir_right = v.is_sign_negative();
-                let dir_left = !dir_right && v != 0.0;
-                self.update_val(Input::Gamepad { id, input: Axis(b, Left) }, dir_left);
-                self.update_val(Input::Gamepad { id: SpecifyGamepad::Any, input: Axis(b, Left) }, dir_left);
+                use AxisSign::*;
+                let dir_pos = v.max(0.0);
+                let dir_neg = (-v).max(0.0);
+                self.update_val(Input::Gamepad { id, input: Axis(b, Pos) }, dir_neg);
+                self.update_val(Input::Gamepad { id: SpecifyGamepad::Any, input: Axis(b, Pos) }, dir_neg);
 
-                self.update_val(Input::Gamepad { id, input: Axis(b, Right) }, dir_right);
-                self.update_val(Input::Gamepad { id: SpecifyGamepad::Any, input: Axis(b, Right) }, dir_right);
+                self.update_val(Input::Gamepad { id, input: Axis(b, Neg) }, dir_pos);
+                self.update_val(Input::Gamepad { id: SpecifyGamepad::Any, input: Axis(b, Neg) }, dir_pos);
             }
             _ => ()
         }
@@ -236,9 +252,13 @@ impl<const BINDS: usize> InputMap<BINDS> {
     pub fn binds(&mut self, action: impl Into<usize>) -> &mut Vec<Input> {
         &mut self.binds[action.into()]
     }
-    /// checks if action is being pressed currently. same as `self.pressing[action.into()]`
+    /// checks if action is being pressed currently. same as `self.press_val[action.into()] != 0.0`
     pub fn pressing(&self, action: impl Into<usize>) -> bool {
-        self.pressing[action.into()]
+        self.press_val[action.into()] != 0.0
+    }
+    /// checks how much action is being pressed. same as `self.press_val[action.into()]`
+    pub fn press_val(&self, action: impl Into<usize>) -> f32 {
+        self.press_val[action.into()]
     }
     /// checks if action was just pressed. same as `self.pressed[action.into()]`
     pub fn pressed(&self, action: impl Into<usize>) -> bool {
@@ -248,19 +268,22 @@ impl<const BINDS: usize> InputMap<BINDS> {
     pub fn released(&self, action: impl Into<usize>) -> bool {
         self.released[action.into()]
     }
-    /// returns 1.0 if pos is pressed, -1.0 if neg is pressed or 0.0 if either pos and neg
-    /// or nothing is pressed. usefull for movement controls.
+    /// returns f32 based on how much pos and neg are pressed. may return values higher than 1.0 in
+    /// the case of mouse movement and scrolling. usefull for movement controls.
     /// ```
-    /// let move_dir = (input.axis(Right, Left), input.axis(Up, Down));
+    /// let move_dir = (input.axis(Neg, Pos), input.axis(Up, Down));
     /// ```
     pub fn axis(&self, pos: impl Into<usize>, neg: impl Into<usize>) -> f32 {
-        (self.pressing(pos) as i8 - self.pressing(neg) as i8) as f32
+        self.press_val(pos) - self.press_val(neg)
     }
 }
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Input {
     Key(PhysicalKey),
     Mouse(MouseButton),
+    MouseMoveX(AxisSign),
+    MouseMoveY(AxisSign),
+    MouseScroll(AxisSign),
     #[cfg(feature = "gamepad")]
     Gamepad { id: SpecifyGamepad, input: GamepadInput  }
 }
@@ -291,7 +314,12 @@ mod gamepad {
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
     pub enum GamepadInput {
         Button(gilrs::ev::Button),
-        Axis(gilrs::ev::Axis, Direction)
+        Axis(gilrs::ev::Axis, AxisSign)
+    }
+    impl From<gilrs::Button> for GamepadInput {
+        fn from(value: gilrs::Button) -> GamepadInput {
+            GamepadInput::Button(value)
+        }
     }
     impl From<GamepadInput> for crate::Input {
         fn from(value: GamepadInput) -> crate::Input {
@@ -304,9 +332,9 @@ mod gamepad {
         }
     }
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-    pub enum Direction {
-        Left,
-        Right
+    pub enum AxisSign {
+        Pos,
+        Neg
     }
     /// specify gamepad to use
     #[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]

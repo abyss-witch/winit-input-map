@@ -4,18 +4,28 @@ enum Actions {
     Left,
     Right,
     Click,
+    MouseXP, MouseXN, MouseYP, MouseYN,
+    MouseScrollP, MouseScrollN
 }
 use winit_input_map::*;
 use Actions::*;
 use gilrs::{Gilrs, Button, ev::Axis};
 use winit::{event::*, keyboard::KeyCode, application::*, window::*, event_loop::*};
 fn main() {
-    let input = input_map!(
+    let mut input = input_map!(
         (Debug, KeyCode::Space, Button::South),
-        (Left,  KeyCode::ArrowLeft, KeyCode::KeyA, GamepadInput::Axis(Axis::LeftStickX, Direction::Left)),
-        (Right, KeyCode::ArrowRight, KeyCode::KeyD, GamepadInput::Axis(Axis::LeftStickX, Direction::Right)),
-        (Click, MouseButton::Left)
+        (Left,  KeyCode::ArrowLeft, KeyCode::KeyA, GamepadInput::Axis(Axis::LeftStickX, AxisSign::Neg)),
+        (Right, KeyCode::ArrowRight, KeyCode::KeyD, GamepadInput::Axis(Axis::LeftStickX, AxisSign::Pos)),
+        (Click, MouseButton::Left),
+        (MouseXP, Input::MouseMoveX(AxisSign::Pos)),
+        (MouseXN, Input::MouseMoveX(AxisSign::Neg)),
+        (MouseYP, Input::MouseMoveY(AxisSign::Pos)),
+        (MouseYN, Input::MouseMoveY(AxisSign::Neg)),
+        (MouseScrollP, Input::MouseScroll(AxisSign::Pos)),
+        (MouseScrollN, Input::MouseScroll(AxisSign::Neg))
     );
+    input.mouse_scale = 1.0;
+    input.scroll_scale = 1.0;
     
     let gilrs = Gilrs::new().unwrap();
     let event_loop = EventLoop::new().unwrap();
@@ -35,6 +45,11 @@ impl<const BINDS: usize> ApplicationHandler for App<BINDS> {
     }
     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
         let input = &mut self.input;
+        let scroll = input.axis(MouseScrollP, MouseScrollN);
+        let mouse_move = (
+            input.axis(MouseXP, MouseXN),
+            input.axis(MouseYP, MouseYN)
+        );
         input.update_with_gilrs(&mut self.gilrs);
         if input.pressed(Debug) {
             println!("pressed {:?}", input.binds(Debug))
@@ -42,17 +57,17 @@ impl<const BINDS: usize> ApplicationHandler for App<BINDS> {
         if input.pressing(Right) || input.pressing(Left) {
             println!("axis: {}", input.axis(Right, Left))
         }
-        if input.mouse_move != (0.0, 0.0) {
+        if mouse_move != (0.0, 0.0) {
             println!(
                 "mouse moved: {:?} and is now at {:?}",
-                input.mouse_move, input.mouse_pos
+                mouse_move, input.mouse_pos
             )
         }
         if input.released(Click) {
             println!("released {:?}", input.binds(Click))
         }
-        if input.mouse_scroll != 0.0 {
-            println!("scrolling {}", input.mouse_scroll);
+        if scroll != 0.0 {
+            println!("scrolling {}", scroll);
         }
         if let Some(other) = input.other_pressed {
             println!("{other:?}");
