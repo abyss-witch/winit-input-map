@@ -147,7 +147,7 @@ impl<const BINDS: usize> InputMap<BINDS> {
             DeviceEvent::MouseWheel { delta } => {
                 let change = match delta {
                     MouseScrollDelta::LineDelta(_, change) => *change,
-                    MouseScrollDelta::PixelDelta(PhysicalPosition { y: change, .. }) => *change as f32
+                    MouseScrollDelta::PixelDelta(PhysicalPosition { y, .. }) => *y as f32
                 } * self.scroll_scale;
                 self.update_val(Input::MouseScroll(AxisSign::Pos), change.max(0.0));
                 self.update_val(Input::MouseScroll(AxisSign::Neg), (-change).max(0.0));
@@ -157,12 +157,8 @@ impl<const BINDS: usize> InputMap<BINDS> {
     }
     pub fn update_with_window_event(&mut self, event: &WindowEvent) {
         match event {
-            WindowEvent::CursorMoved { position, .. } => {
-                self.update_mouse(*position);
-            }
-            WindowEvent::MouseInput { state, button, .. } => {
-                self.update_buttons(state, *button)
-            }
+            WindowEvent::CursorMoved { position, .. } => self.update_mouse(*position),
+            WindowEvent::MouseInput { state, button, .. } => self.update_buttons(state, *button),
             WindowEvent::KeyboardInput { event, .. } => self.update_keys(event),
             _ => ()
         }
@@ -307,6 +303,12 @@ impl From<MouseButton> for Input {
         Self::Mouse(value)
     }
 }
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum AxisSign {
+    Pos,
+    Neg
+}
+
 #[cfg(feature = "gamepad")]
 pub use gamepad::*;
 #[cfg(feature = "gamepad")]
@@ -314,7 +316,7 @@ mod gamepad {
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
     pub enum GamepadInput {
         Button(gilrs::ev::Button),
-        Axis(gilrs::ev::Axis, AxisSign)
+        Axis(gilrs::ev::Axis, crate::AxisSign)
     }
     impl From<gilrs::Button> for GamepadInput {
         fn from(value: gilrs::Button) -> GamepadInput {
@@ -330,11 +332,6 @@ mod gamepad {
         fn from(value: gilrs::Button) -> crate::Input {
             Self::Gamepad { input: GamepadInput::Button(value), id: Default::default() }
         }
-    }
-    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-    pub enum AxisSign {
-        Pos,
-        Neg
     }
     /// specify gamepad to use
     #[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
