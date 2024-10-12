@@ -138,7 +138,7 @@ impl<const BINDS: usize> InputMap<BINDS> {
         match event {
             DeviceEvent::MouseMotion { delta } => {
                 let x = delta.0 as f32 * self.mouse_scale;
-                let y = delta.0 as f32 * self.mouse_scale;
+                let y = delta.1 as f32 * self.mouse_scale;
                 self.update_val(Input::MouseMoveX(AxisSign::Pos), x.max(0.0));
                 self.update_val(Input::MouseMoveX(AxisSign::Neg), (-x).max(0.0));
                 self.update_val(Input::MouseMoveY(AxisSign::Pos), y.max(0.0));
