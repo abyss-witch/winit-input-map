@@ -8,8 +8,8 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.run_app(&mut App { window: None, input, gilrs }).unwrap();
 }
-struct App<const BINDS: usize> { window: Option<Window>, input: InputMap<BINDS>, gilrs: Gilrs }
-impl<const BINDS: usize> ApplicationHandler for App<BINDS> {
+struct App { window: Option<Window>, input: InputMap<()>, gilrs: Gilrs }
+impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.window = Some(event_loop.create_window(Window::default_attributes()).unwrap());
     }

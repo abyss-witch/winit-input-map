@@ -386,17 +386,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "derive-to-usize"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7161a483695f3cdb2881f1eddfd155093c5b8be8b10d97dda5dc61a461061f3"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2234,9 +2223,8 @@ dependencies = [
 
 [[package]]
 name = "winit-input-map"
-version = "0.3.0"
+version = "0.3.2"
 dependencies = [
- "derive-to-usize",
  "gilrs",
  "glium-types",
  "winit 0.30.5",

@@ -1,4 +1,4 @@
-#[derive(ToUsize)]
+#[derive(PartialEq, Eq, Clone, Copy, Hash)]
 enum Actions {
     Debug,
     Left,
@@ -9,20 +9,26 @@ enum Actions {
 }
 use winit_input_map::*;
 use Actions::*;
-use gilrs::{Gilrs, Button, ev::Axis};
+use gilrs::{Gilrs};
 use winit::{event::*, keyboard::KeyCode, application::*, window::*, event_loop::*};
 fn main() {
     let mut input = input_map!(
-        (Debug, KeyCode::Space, Button::South),
-        (Left,  KeyCode::ArrowLeft, KeyCode::KeyA, GamepadInput::Axis(Axis::LeftStickX, AxisSign::Neg)),
-        (Right, KeyCode::ArrowRight, KeyCode::KeyD, GamepadInput::Axis(Axis::LeftStickX, AxisSign::Pos)),
+        (Debug, KeyCode::Space, GamepadButton::South),
+        (Left,
+            KeyCode::ArrowLeft,  KeyCode::KeyA,
+            GamepadInput::Axis(Axis::LeftStickX, AxisSign::Neg)
+        ),
+        (Right,
+            KeyCode::ArrowRight, KeyCode::KeyD,
+            GamepadInput::Axis(Axis::LeftStickX, AxisSign::Pos)
+        ),
         (Click, MouseButton::Left),
-        (MouseXP, Input::MouseMoveX(AxisSign::Pos)),
-        (MouseXN, Input::MouseMoveX(AxisSign::Neg)),
-        (MouseYP, Input::MouseMoveY(AxisSign::Pos)),
-        (MouseYN, Input::MouseMoveY(AxisSign::Neg)),
-        (MouseScrollP, Input::MouseScroll(AxisSign::Pos)),
-        (MouseScrollN, Input::MouseScroll(AxisSign::Neg))
+        (MouseXP, InputCode::MOUSE_MOVE_X_POS),
+        (MouseXN, InputCode::MOUSE_MOVE_X_NEG),
+        (MouseYP, InputCode::MOUSE_MOVE_Y_POS),
+        (MouseYN, InputCode::MOUSE_MOVE_Y_NEG),
+        (MouseScrollP, InputCode::MOUSE_SCROLL_POS),
+        (MouseScrollN, InputCode::MOUSE_SCROLL_NEG)
     );
     input.mouse_scale = 1.0;
     input.scroll_scale = 1.0;
@@ -31,32 +37,39 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.run_app(&mut App { window: None, input, gilrs }).unwrap();
 }
-struct App<const BINDS: usize> { window: Option<Window>, input: InputMap<BINDS>, gilrs: Gilrs }
-impl<const BINDS: usize> ApplicationHandler for App<BINDS> {
+struct App { window: Option<Window>, input: InputMap<Actions>, gilrs: Gilrs }
+impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        self.window = Some(event_loop.create_window(Window::default_attributes()).unwrap());
+        let window_settings = Window::default_attributes();
+        let window = event_loop.create_window();
+        self.window = Some(window.unwrap());
     }
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
+    fn window_event(
+        &mut self, event_loop: &ActiveEventLoop,
+        _: WindowId, event: WindowEvent
+    ) {
         self.input.update_with_window_event(&event);
         if let WindowEvent::CloseRequested = &event { event_loop.exit() }
     }
-    fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
+    fn device_event(
+        &mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent
+    ) {
         self.input.update_with_device_event(&event);
     }
     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
         let input = &mut self.input;
         let scroll = input.axis(MouseScrollP, MouseScrollN);
-        let mouse_move = (
-            input.axis(MouseXP, MouseXN),
-            input.axis(MouseYP, MouseYN)
-        );
-        input.update_with_gilrs(&mut self.gilrs);
+                input.update_with_gilrs(&mut self.gilrs);
         if input.pressed(Debug) {
-            println!("pressed {:?}", input.binds(Debug))
+            println!("pressed {:?}", input.binds.iter().filter_map(|(a, s)| {
+                if s.contains(&Debug) { Some(*a) } else { None }
+            }).collect::<Vec<InputCode>>())
         }
         if input.pressing(Right) || input.pressing(Left) {
             println!("axis: {}", input.axis(Right, Left))
         }
+
+        let mouse_move = input.dir(MouseXP, MouseXN, MouseYP, MouseYN);
         if mouse_move != (0.0, 0.0) {
             println!(
                 "mouse moved: {:?} and is now at {:?}",
@@ -64,7 +77,7 @@ impl<const BINDS: usize> ApplicationHandler for App<BINDS> {
             )
         }
         if input.released(Click) {
-            println!("released {:?}", input.binds(Click))
+            println!("released")
         }
         if scroll != 0.0 {
             println!("scrolling {}", scroll);

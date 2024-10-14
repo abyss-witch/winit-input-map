@@ -2,7 +2,7 @@ use winit_input_map::*;
 use gilrs::Gilrs;
 use winit::{event::*, application::*, window::*, event_loop::*, keyboard::KeyCode};
 
-#[derive(ToUsize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum Action { Return }
 
 fn main() {
@@ -13,8 +13,8 @@ fn main() {
     event_loop.run_app(&mut App { window: None, input, gilrs, text: String::new() }).unwrap();
 }
 
-struct App<const BINDS: usize> { window: Option<Window>, input: InputMap<BINDS>, gilrs: Gilrs, text: String }
-impl<const BINDS: usize> ApplicationHandler for App<BINDS> {
+struct App { window: Option<Window>, input: InputMap<Action>, gilrs: Gilrs, text: String }
+impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.window = Some(event_loop.create_window(Window::default_attributes()).unwrap());
     }
