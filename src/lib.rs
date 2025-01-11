@@ -21,7 +21,7 @@
 //! use Actions::*;
 //!
 //! let input = input_map!(
-//!     (Foo, KeyCode::Space, GamepadButton::South)
+//!     (Foo, KeyCode::Space, GamepadInput::South)
 //! );
 //! let ev = EventLoop::new().unwrap();
 //! let gilrs = Gilrs::new().unwrap();
@@ -71,7 +71,7 @@ pub use crate::input_code::*;
 /// ```
 /// use Action::*;
 /// use winit_input_map::*;
-/// use winit::{keyboard::KeyCode, event::MouseButton}
+/// use winit::{keyboard::KeyCode, event::MouseButton};
 /// #[derive(Hash, PartialEq, Eq, Clone, Copy)]
 /// enum Action {
 ///     Jump,
@@ -81,8 +81,8 @@ pub use crate::input_code::*;
 /// }
 /// let mut input = input_map!(
 ///     (Jump,     KeyCode::Space                    ),
-///     (Left,     KeyCode::KeyA, KeyCode::LeftArrow ),
-///     (Right,    KeyCode::KeyD, KeyCode::RightArrow),
+///     (Left,     KeyCode::KeyA, KeyCode::ArrowLeft ),
+///     (Right,    KeyCode::KeyD, KeyCode::ArrowRight),
 ///     (Interact, MouseButton::Left                 )
 /// );
 /// ```

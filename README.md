@@ -14,32 +14,14 @@ enum Actions {
 }
 // set up
 // ...
-let mut input_map!(
-    (MoveLeft,
-        KeyCode::KeyA, KeyCode::ArrowLeft, GamepadButton::DPadLeft,
-        InputCode::gamepad_axis_neg(GamepadAxis::LeftStickX)
-    ),
-    (MoveRight,
-        KeyCode::KeyD, KeyCode::ArrowRight, GamepadButton::DPadRight,
-        InputCode::gamepad_axis_pos(GamepadAxis::LeftStickX)
-    ),
-    (CameraLeft,
-        InputCode::MOUSE_MOVE_X_NEG,
-        InputCode::gamepad_axis_neg(GamepadAxis::RightStickX)
-    ),
-    (CameraRight,
-        InputCode::MOUSE_MOVE_X_POS,
-        InputCode::gamepad_axis_pos(GamepadAxis::RightStickX)
-    ),
-    (CameraUp,
-        InputCode::MOUSE_MOVE_Y_POS,
-        InputCode::gamepad_axis_pos(GamepadAxis::RightStickY)
-    ),
-    (CameraDown,
-        InputCode::MOUSE_MOVE_Y_NEG,
-        InputCode::gamepad_axis_neg(GamepadAxis::RightStickY)
-    )
-);
+let mut input = { use base_input_codes::*; input_map!(
+    (MoveLeft,  KeyA, ArrowLeft,  DPadLeft,  LeftStickLeft ),
+    (MoveRight, KeyD, ArrowRight, DPadRight, LeftStickRight),
+    (CameraLeft,  MouseMoveLeft,  RightStickLeft ),
+    (CameraRight, MouseMoveRight, RightStickRight),
+    (CameraUp,    MouseMoveUp,    RightStickUp   ),
+    (CameraDown,  MouseMoveDown,  RightStickDown )
+) };
 // ...
 
 // gameplay loop
@@ -82,50 +64,45 @@ input.init();
 
 A more complete example:
 ```rust
+
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
 enum Actions {
     Debug,
     Left,
     Right,
     Click,
-    MouseXP, MouseXN, MouseYP, MouseYN,
-    MouseScrollP, MouseScrollN
+    MouseR, MouseL, MouseU, MouseD,
+    ScrollU, ScrollD
 }
 use winit_input_map::*;
 use Actions::*;
-use gilrs::{Gilrs};
-use winit::{event::*, keyboard::KeyCode, application::*, window::*, event_loop::*};
-
-let mut input = input_map!(
-    (Debug, KeyCode::Space, GamepadButton::South),
-    (Left,
-        KeyCode::ArrowLeft,  KeyCode::KeyA,
-        GamepadInput::Axis(Axis::LeftStickX, AxisSign::Neg)
-    ),
-    (Right,
-        KeyCode::ArrowRight, KeyCode::KeyD,
-        GamepadInput::Axis(Axis::LeftStickX, AxisSign::Pos)
-    ),
-    (Click, MouseButton::Left),
-    (MouseXP,      InputCode::MOUSE_MOVE_X_POS),
-    (MouseXN,      InputCode::MOUSE_MOVE_X_NEG),
-    (MouseYP,      InputCode::MOUSE_MOVE_Y_POS),
-    (MouseYN,      InputCode::MOUSE_MOVE_Y_NEG),
-    (MouseScrollP, InputCode::MOUSE_SCROLL_POS),
-    (MouseScrollN, InputCode::MOUSE_SCROLL_NEG)
-);
-input.mouse_scale = 1.0;
-input.scroll_scale = 1.0;
-
-let gilrs = Gilrs::new().unwrap();
-let event_loop = EventLoop::new().unwrap();
-event_loop.run_app(&mut App { window: None, input, gilrs }).unwrap();
-
+use gilrs::Gilrs;
+use winit::{event::*, application::*, window::*, event_loop::*};
+fn main() {
+    let mut input = { use base_input_codes::*; input_map!(
+        (Debug, Space, South),
+        (Left,  ArrowLeft,  KeyA, LeftStickLeft ),
+        (Right, ArrowRight, KeyD, LeftStickRight),
+        (Click, MouseButton::Left),
+        (MouseR, MouseMoveRight, RightStickRight),
+        (MouseL, MouseMoveLeft,  RightStickLeft ),
+        (MouseU, MouseMoveUp,    RightStickUp   ),
+        (MouseD, MouseMoveDown,  RightStickDown ),
+        (ScrollU, Equal, MouseScrollUp  ),
+        (ScrollD, Minus, MouseScrollDown)
+    ) };
+    input.mouse_scale = 1.0;
+    input.scroll_scale = 1.0;
+    
+    let gilrs = Gilrs::new().unwrap();
+    let event_loop = EventLoop::new().unwrap();
+    event_loop.run_app(&mut App { window: None, input, gilrs }).unwrap();
+}
 struct App { window: Option<Window>, input: InputMap<Actions>, gilrs: Gilrs }
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_settings = Window::default_attributes();
-        let window = event_loop.create_window();
+        let window = event_loop.create_window(window_settings);
         self.window = Some(window.unwrap());
     }
     fn window_event(
@@ -141,11 +118,13 @@ impl ApplicationHandler for App {
         self.input.update_with_device_event(&event);
     }
     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
+        self.input.update_with_gilrs(&mut self.gilrs);
+
         let input = &mut self.input;
-        let scroll = input.axis(MouseScrollP, MouseScrollN);
-                input.update_with_gilrs(&mut self.gilrs);
+        let scroll = input.axis(ScrollU, ScrollD);
+    
         if input.pressed(Debug) {
-            println!("pressed {:?}", input.binds.iter().filter_map(|(a, s)| {
+            println!("pressed {:?}", input.binds.iter().filter_map(|(a, (_, s))| {
                 if s.contains(&Debug) { Some(*a) } else { None }
             }).collect::<Vec<InputCode>>())
         }
@@ -153,7 +132,7 @@ impl ApplicationHandler for App {
             println!("axis: {}", input.axis(Right, Left))
         }
 
-        let mouse_move = input.dir(MouseXP, MouseXN, MouseYP, MouseYN);
+        let mouse_move = input.dir(MouseL, MouseR, MouseU, MouseD);
         if mouse_move != (0.0, 0.0) {
             println!(
                 "mouse moved: {:?} and is now at {:?}",
@@ -166,7 +145,7 @@ impl ApplicationHandler for App {
         if scroll != 0.0 {
             println!("scrolling {}", scroll);
         }
-        if let Some(other) = input.other_pressed {
+        if let Some(other) = input.recently_pressed {
             println!("{other:?}");
         }
         std::thread::sleep(std::time::Duration::from_millis(100));

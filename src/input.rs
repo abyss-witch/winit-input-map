@@ -1,3 +1,4 @@
+#[cfg(feature = "mice-keyboard")]
 use winit::{
     dpi::PhysicalPosition,
     event::*,
@@ -15,10 +16,11 @@ fn v(a: f32, b: f32) -> Vec2 {
     #[cfg(feature = "glium-types")]
     { Vec2::new(a, b) }
 }
-
-
 /// A struct that handles all your input needs once you've hooked it up to winit and gilrs.
 /// ```
+/// use gilrs::Gilrs;
+/// use winit::{event::*, application::*, window::*, event_loop::*};
+/// use winit_input_map::*;
 /// struct App {
 ///     window: Option<Window>,
 ///     input: InputMap<()>,
@@ -45,11 +47,12 @@ fn v(a: f32, b: f32) -> Vec2 {
 /// }
 /// ```
 pub struct InputMap<F: Hash + Eq + Clone + Copy> {
-    /// Stores what each input code is bound to
-    pub binds: HashMap<InputCode, Vec<F>>,
+    /// Stores what each input code is bound to and its previous press value
+    pub binds: HashMap<InputCode, (f32, Vec<F>)>,
     /// f32 is current val, 1st bool is pressed and 2nd bool is released.
     action_val: HashMap<F, (f32, bool, bool)>,
     /// The mouse position
+    #[cfg(feature = "mice-keyboard")]
     pub mouse_pos: Vec2,
     /// The last input event, even if it isn't in the binds. Useful for handling rebinding
     pub recently_pressed: Option<InputCode>,
@@ -57,29 +60,34 @@ pub struct InputMap<F: Hash + Eq + Clone + Copy> {
     pub text_typed: Option<String>,
     /// Since most values are from 0-1 reducing the mouse sensitivity will result in better
     /// consistancy
+    #[cfg(feature = "mice-keyboard")]
     pub mouse_scale: f32,
     /// Since most values are from 0-1 reducing the scroll sensitivity will result in better
     /// consistancy
+    #[cfg(feature = "mice-keyboard")]
     pub scroll_scale: f32,
     /// The minimum value something has to be at to count as being pressed. Values over 1 will
     /// result in regular buttons being unusable
     pub press_sensitivity: f32
 }
-impl<F: Hash + Eq + Clone + Copy> Default for InputMap<F> {
+impl<F: Hash + Eq + Copy> Default for InputMap<F> {
     fn default() -> Self {
         Self {
-            mouse_scale: 0.1,
-            press_sensitivity: 0.5,
-            scroll_scale:      0.1,
-            mouse_pos: v(0.0, 0.0),
-            recently_pressed: None,
-            text_typed:    None,
-            binds:      HashMap::<InputCode,    Vec<F>>::new(),
-            action_val: HashMap::<F, (f32, bool, bool)>::new()
+            #[cfg(feature = "mice-keyboard")]
+            mouse_scale:        0.1,
+            press_sensitivity:  0.5,
+            #[cfg(feature = "mice-keyboard")]
+            scroll_scale:       1.0,
+            #[cfg(feature = "mice-keyboard")]
+            mouse_pos:  v(0.0, 0.0),
+            recently_pressed:  None,
+            text_typed:        None,
+            binds:      HashMap::<InputCode, (f32, Vec<F>)>::new(),
+            action_val: HashMap::<F,     (f32, bool, bool)>::new()
         }
     }
 }
-impl<F: Hash + Eq + Clone + Copy> InputMap<F> {
+impl<F: Hash + Eq + Copy> InputMap<F> {
     /// Create new input system. It's recommended to use the `input_map!` macro to reduce boilerplate
     /// and increase readability.
     /// ```
@@ -94,11 +102,11 @@ impl<F: Hash + Eq + Clone + Copy> InputMap<F> {
     ///     Neg
     /// }
     /// //doesnt have to be the same ordered as the enum.
-    /// let mut input = Input::new([
-    ///     (vec![Input::keycode(KeyCode::KeyW)], Forward),
-    ///     (vec![Input::keycode(KeyCode::KeyA)], Pos),
-    ///     (vec![Input::keycode(KeyCode::KeyS)], Back),
-    ///     (vec![Input::keycode(KeyCode::KeyD)], Neg)
+    /// let input = InputMap::new(&[
+    ///     (Forward, vec![KeyCode::KeyW.into()]),
+    ///     (Pos,     vec![KeyCode::KeyA.into()]),
+    ///     (Back,    vec![KeyCode::KeyS.into()]),
+    ///     (Neg,     vec![KeyCode::KeyD.into()])
     /// ]);
     /// ```
     pub fn new(binds: &[(F, Vec<InputCode>)]) -> Self {
@@ -118,10 +126,10 @@ impl<F: Hash + Eq + Clone + Copy> InputMap<F> {
     /// Gets a mutable vector of what actions input_code is bound to
     pub fn mut_bind(&mut self, input_code: InputCode) -> &mut Vec<F> {
         let has_val = self.binds.contains_key(&input_code);
-        (if has_val { self.binds.get_mut(&input_code) } else {
-            self.binds.insert(input_code, vec![]);
+        &mut (if has_val { self.binds.get_mut(&input_code) } else {
+            self.binds.insert(input_code, (0.0, vec![]));
             self.binds.get_mut(&input_code)
-        }).unwrap()
+        }).unwrap().1
     }
     /// Updates the input map using a winit event. Make sure to call `input.init()` when your done with
     /// the input this loop.
@@ -144,6 +152,7 @@ impl<F: Hash + Eq + Clone + Copy> InputMap<F> {
     ///     }
     /// });
     /// ```
+    #[cfg(feature = "mice-keyboard")]
     #[deprecated = "use `update_with_window_event` and `update_with_device_event`"]
     pub fn update_with_winit(&mut self, event: &Event<()>) {
         match event {
@@ -152,30 +161,34 @@ impl<F: Hash + Eq + Clone + Copy> InputMap<F> {
             _ => ()
         }
     }
+    #[cfg(feature = "mice-keyboard")]
     pub fn update_with_device_event(&mut self, event: &DeviceEvent) {
+        use base_input_codes::*;
         match event {
             DeviceEvent::MouseMotion { delta } => {
                 let x = delta.0 as f32 * self.mouse_scale;
                 let y = delta.1 as f32 * self.mouse_scale;
-                self.modify_val(DeviceInput::MouseMoveX(AxisSign::Pos).into(), |v| *v += x.max(0.0));
-                self.modify_val(DeviceInput::MouseMoveX(AxisSign::Neg).into(), |v| *v += (-x).max(0.0));
-                self.modify_val(DeviceInput::MouseMoveY(AxisSign::Pos).into(), |v| *v += y.max(0.0));
-                self.modify_val(DeviceInput::MouseMoveY(AxisSign::Neg).into(), |v| *v += (-y).max(0.0));
+                self.modify_val(MouseMoveLeft.into(),  |v| v + x.max(0.0));
+                self.modify_val(MouseMoveRight.into(), |v| v - x.min(0.0));
+                self.modify_val(MouseMoveUp.into(),    |v| v + y.max(0.0));
+                self.modify_val(MouseMoveDown.into(),  |v| v - y.min(0.0));
             },
             DeviceEvent::MouseWheel { delta } => {
                 let (x, y) = match delta {
                     MouseScrollDelta::LineDelta(x, y) => (*x, *y),
                     MouseScrollDelta::PixelDelta(PhysicalPosition { x, y }) => (*x as f32, *y as f32)
                 };
-                let (x, y) = (x * self.mouse_scale, y * self.mouse_scale);
-                self.modify_val(DeviceInput::MouseScroll(AxisSign::Pos ).into(), |v| *v += y.max(0.0));
-                self.modify_val(DeviceInput::MouseScroll(AxisSign::Neg ).into(), |v| *v += (-y).max(0.0));
-                self.modify_val(DeviceInput::MouseScrollX(AxisSign::Pos).into(), |v| *v += x.max(0.0));
-                self.modify_val(DeviceInput::MouseScrollX(AxisSign::Neg).into(), |v| *v += (-x).max(0.0));
+                let (x, y) = (x * self.scroll_scale, y * self.scroll_scale);
+                
+                self.modify_val(MouseScrollUp.into(), |v| v + y.max(0.0));
+                self.modify_val(MouseScrollDown.into(),   |v| v - y.min(0.0));
+                self.modify_val(MouseScrollLeft.into(), |v| v + x.max(0.0));
+                self.modify_val(MouseScrollRight.into(), |v| v - x.min(0.0));
             },
              _ => (),
         }
     }
+    #[cfg(feature = "mice-keyboard")]
     pub fn update_with_window_event(&mut self, event: &WindowEvent) {
         match event {
             WindowEvent::CursorMoved { position, .. } => self.update_mouse(*position),
@@ -192,23 +205,27 @@ impl<F: Hash + Eq + Clone + Copy> InputMap<F> {
     }
     /// Makes the input map ready to recieve new events.
     pub fn init(&mut self) {
-        self.update_val(DeviceInput::MouseMoveX(  AxisSign::Pos).into(), 0.0);
-        self.update_val(DeviceInput::MouseMoveX(  AxisSign::Neg).into(), 0.0);
-        self.update_val(DeviceInput::MouseMoveY(  AxisSign::Pos).into(), 0.0);
-        self.update_val(DeviceInput::MouseMoveY(  AxisSign::Neg).into(), 0.0);
-        self.update_val(DeviceInput::MouseScroll( AxisSign::Pos).into(), 0.0);
-        self.update_val(DeviceInput::MouseScroll( AxisSign::Neg).into(), 0.0);
-        self.update_val(DeviceInput::MouseScrollX(AxisSign::Pos).into(), 0.0);
-        self.update_val(DeviceInput::MouseScrollX(AxisSign::Neg).into(), 0.0);
+        #[cfg(feature = "mice-keyboard")]
+        {
+            use base_input_codes::*;
+            for i in [MouseMoveLeft, MouseMoveRight,   
+            MouseMoveUp, MouseMoveDown, MouseScrollUp,
+            MouseScrollDown, MouseScrollLeft, 
+            MouseScrollRight] {
+                self.update_val(i.into(), 0.0);
+            }
+        }
         self.action_val.iter_mut().for_each(|(_, i)|
             *i = (i.0, false, false)
         );
         self.recently_pressed = None;
         self.text_typed = None;
     }
+    #[cfg(feature = "mice-keyboard")]
     fn update_mouse(&mut self, position: PhysicalPosition<f64>) {
         self.mouse_pos = v(position.x as f32, position.y as f32);
     }
+    #[cfg(feature = "mice-keyboard")]
     fn update_keys(&mut self, event: &KeyEvent) {
         let input_code = event.physical_key.into();
 
@@ -216,70 +233,88 @@ impl<F: Hash + Eq + Clone + Copy> InputMap<F> {
             string.push_str(new);
         } else { self.text_typed = event.text.as_ref().map(|i| i.to_string()) }
 
-        self.update_val(input_code, event.state.is_pressed() as u8 as f32);
+        self.update_val(input_code, event.state.is_pressed().into());
     }
+    #[cfg(feature = "mice-keyboard")]
     fn update_buttons(&mut self, state: &ElementState, button: MouseButton) {
         let input_code = button.into();
-        self.update_val(input_code, state.is_pressed() as u8 as f32);
+        self.update_val(input_code, state.is_pressed().into());
     }
     /// updates provided input code
     fn update_val(&mut self, input_code: InputCode, val: f32) {
-        let pressed = val >= self.press_sensitivity;
-        if pressed { self.recently_pressed = Some(input_code) }
-        if let Some(binds) = self.binds.get(&input_code) {
-            for &action in binds {
-                let jpressed = pressed && !self.pressing(action);
-                let released = !pressed && self.pressing(action);
-                self.action_val.insert(action, (val, jpressed, released));
-            }
+        let pressing = val >= self.press_sensitivity;
+        if pressing { self.recently_pressed = Some(input_code) } 
+        let Some((bind_val, binds)) = self.binds.get(&input_code) else { return };
+        
+        let diff = val - bind_val; // change between current and last val
+        for &action in binds {
+            let pressed = self.pressing(action);
+            let jpressed = !pressed && pressing;
+            let released = pressed && !pressing;
+            // fixes overriding other input bound to the same action
+            let mut val = self.action_val(action) + diff;
+            if val <= f32::EPSILON { val = 0.0 }
+            self.action_val.insert(action, (val, jpressed, released));
         }
+        
+        self.binds.get_mut(&input_code).unwrap().0 = val;
     }
-    fn modify_val<FN: Fn(&mut f32)>(&mut self, input_code: InputCode, f: FN) {
-        if let Some(binds) = self.binds.get(&input_code) {
-            for &action in binds {
-                let mut val = self.action_val.get(&action)
-                    .unwrap_or(&(0.0, false, false)).0;
-                f(&mut val);
-                let pressed = val >= self.press_sensitivity;
-                if pressed { self.recently_pressed = Some(input_code) }
-                
-                let jpressed = pressed && !self.pressing(action);
-                let released = !pressed && self.pressing(action);
-                self.action_val.insert(action, (val, jpressed, released));
-            }
+    fn modify_val<FN: Fn(f32) -> f32>(&mut self, input_code: InputCode, f: FN) {
+        let Some((bind_val, binds)) = self.binds.get(&input_code) else {
+            if f(0.0) >= self.press_sensitivity { self.recently_pressed = Some(input_code) }
+            return;
+        };
+
+        let val = f(*bind_val);
+        let diff = val - *bind_val;
+        for &action in binds {
+            let pressing = val >= self.press_sensitivity;
+            if pressing { self.recently_pressed = Some(input_code) }
+            
+            let pressed = self.pressing(action);
+            let jpressed = pressing && !pressed;
+            let released = !pressing && pressed;
+
+            let val = self.action_val(action) + diff;
+            self.action_val.insert(action, (val, jpressed, released));
         }
+        
+        self.binds.get_mut(&input_code).unwrap().0 = val;
     }
     #[cfg(feature = "gamepad")]
     fn update_gamepad(&mut self, event: gilrs::Event) {
         let gilrs::Event { id, event, .. } = event;
-
+        use crate::input_code::{axis_pos, axis_neg};
         use gilrs::ev::EventType;
         match event {
-            EventType::ButtonPressed(b, _) => {
-                let a: GamepadInput = b.into();
-                self.update_val(a.with_id(id), 1.0);
-                self.update_val(b.into(),      1.0);
-            },
-            EventType::ButtonReleased(b, _) => {
-                let a: GamepadInput = b.into();
-                self.update_val(a.with_id(id), 0.0);
-                self.update_val(b.into(),      0.0);
-            },
             EventType::ButtonChanged(b, v, _) => {
                 let a: GamepadInput = b.into();
-                self.update_val(b.into(),                    v);
+                self.update_val(a.into(), v);
                 self.update_val(a.with_id(id), v);
             },
             EventType::AxisChanged(b, v, _) => {
                 let dir_pos = v.max(0.0);
                 let dir_neg = (-v).max(0.0);
-                let input_pos = InputCode::gamepad_axis_pos(b);
-                let input_neg = InputCode::gamepad_axis_neg(b);
+                let input_pos = axis_pos(b);
+                let input_neg = axis_neg(b);
 
-                self.update_val(input_pos,                    dir_pos);
-                self.update_val(input_neg,                    dir_neg);
-                self.update_val(input_pos.set_gamepad_id(id), dir_pos);
-                self.update_val(input_neg.set_gamepad_id(id), dir_neg);
+                self.update_val(input_pos.into(),      dir_pos);
+                self.update_val(input_neg.into(),      dir_neg);
+                self.update_val(input_pos.with_id(id), dir_pos);
+                self.update_val(input_neg.with_id(id), dir_neg);
+            },
+            EventType::Disconnected => {
+                // reset input
+
+                use GamepadInput::*;
+                for i in [LeftStickLeft, LeftStickRight, LeftStickUp, LeftStickDown, LeftStickPress,
+                 RightStickLeft, RightStickRight, RightStickUp, RightStickDown,
+                 RightStickPress, DPadLeft, DPadRight, DPadUp, DPadDown, LeftZ, RightZ,
+                 South, East, North, West, LeftTrigger, LeftTrigger2, RightTrigger,
+                 RightTrigger2,  Select, Start, Mode, Other].iter() {
+                    self.update_val(i.with_id(id), 0.0);
+                    self.update_val((*i).into(),   0.0);
+                 }
             }
             _ => ()
         }
@@ -289,7 +324,7 @@ impl<F: Hash + Eq + Clone + Copy> InputMap<F> {
     pub fn pressing(&self, action: F) -> bool {
         self.action_val(action) >= self.press_sensitivity
     }
-    /// Checks how much action is being pressed. May be higher than 1 in the case of scroll wheels
+    /// Checks how wheremuch action is being pressed. May be higher than 1 in the case of scroll wheels
     /// and mouse movement.
     pub fn action_val(&self, action: F) -> f32 {
         if let Some(&(v, _, _)) = self.action_val.get(&action) { v } else {  0.0  }
@@ -305,7 +340,7 @@ impl<F: Hash + Eq + Clone + Copy> InputMap<F> {
     /// Returns f32 based on how much pos and neg are pressed. may return values higher than 1.0 in
     /// the case of mouse movement and scrolling. usefull for movement controls. for 2d values see
     /// `[dir]` and `[dir_max_len_1]`
-    /// ```
+    /// ```no_run
     /// let move_dir = input.axis(Neg, Pos);
     /// ```
     /// same as `input.action_val(pos) - input.action_val(neg)`
