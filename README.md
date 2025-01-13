@@ -37,31 +37,6 @@ camera.pos += input.dir(CameraRight, CameraLeft, CameraUp, CameraDown);
     - Easy axis and vector handling
     - Easy rebinding
     - Mouse movement and scrolling
-```rust
-#[derive(Hash, PartialEq, Eq, Clone, Copy)]
-enum Actions {
-    Debug, Click,
-    Left, Right 
-}
-use winit_input_map::*;
-use Actions::*;
-
-let mut input = input_map!(
-    (Debug, KeyCode::Space),
-    (Left,  KeyCode::ArrowLeft, KeyCode::KeyA),
-    (Right, KeyCode::ArrowRight, KeyCode::KeyD),
-    (Click, MouseButton::Left)
-);
-
-// winit event handler
-input.update(&event);
-
-// use the input map!
-
-// end of using event handler
-input.init();
-```
-
 A more complete example:
 ```rust
 
@@ -113,9 +88,9 @@ impl ApplicationHandler for App {
         if let WindowEvent::CloseRequested = &event { event_loop.exit() }
     }
     fn device_event(
-        &mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent
+        &mut self, _: &ActiveEventLoop, id: DeviceId, event: DeviceEvent
     ) {
-        self.input.update_with_device_event(&event);
+        self.input.update_with_device_event(id, &event);
     }
     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
         self.input.update_with_gilrs(&mut self.gilrs);

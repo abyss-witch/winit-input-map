@@ -17,8 +17,8 @@ impl ApplicationHandler for App {
         self.input.update_with_window_event(&event);
         if let WindowEvent::CloseRequested = &event { event_loop.exit() }
     }
-    fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
-        self.input.update_with_device_event(&event);
+    fn device_event(&mut self, _: &ActiveEventLoop, id: DeviceId, event: DeviceEvent) {
+        self.input.update_with_device_event(id, &event);
     }
     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
         self.input.update_with_gilrs(&mut self.gilrs);

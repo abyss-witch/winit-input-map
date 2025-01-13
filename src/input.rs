@@ -34,8 +34,8 @@ fn v(a: f32, b: f32) -> Vec2 {
 ///         self.input.update_with_window_event(&event);
 ///         if let WindowEvent::CloseRequested = &event { event_loop.exit() }
 ///     }
-///     fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
-///         self.input.update_with_device_event(&event);
+///     fn device_event(&mut self, _: &ActiveEventLoop, id: DeviceId, event: DeviceEvent) {
+///         self.input.update_with_device_event(id, &event);
 ///     }
 ///     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
 ///         self.input.update_with_gilrs(&mut self.gilrs);
@@ -74,7 +74,7 @@ impl<F: Hash + Eq + Copy> Default for InputMap<F> {
     fn default() -> Self {
         Self {
             #[cfg(feature = "mice-keyboard")]
-            mouse_scale:        0.1,
+            mouse_scale:        0.01,
             press_sensitivity:  0.5,
             #[cfg(feature = "mice-keyboard")]
             scroll_scale:       1.0,
@@ -157,34 +157,23 @@ impl<F: Hash + Eq + Copy> InputMap<F> {
     pub fn update_with_winit(&mut self, event: &Event<()>) {
         match event {
             Event::WindowEvent { event, .. } => self.update_with_window_event(event),
-            Event::DeviceEvent { event, .. } => self.update_with_device_event(event),
+            Event::DeviceEvent { event, device_id, .. } => self.update_with_device_event(*device_id, event),
             _ => ()
         }
     }
     #[cfg(feature = "mice-keyboard")]
-    pub fn update_with_device_event(&mut self, event: &DeviceEvent) {
+    pub fn update_with_device_event(&mut self, id: DeviceId, event: &DeviceEvent) {
         use base_input_codes::*;
         match event {
             DeviceEvent::MouseMotion { delta } => {
                 let x = delta.0 as f32 * self.mouse_scale;
                 let y = delta.1 as f32 * self.mouse_scale;
-                self.modify_val(MouseMoveLeft.into(),  |v| v + x.max(0.0));
-                self.modify_val(MouseMoveRight.into(), |v| v - x.min(0.0));
-                self.modify_val(MouseMoveUp.into(),    |v| v + y.max(0.0));
-                self.modify_val(MouseMoveDown.into(),  |v| v - y.min(0.0));
+                self.modify_val(MouseMoveLeft.with_id(id),  |v| v + x.max(0.0));
+                self.modify_val(MouseMoveRight.with_id(id), |v| v - x.min(0.0));
+                self.modify_val(MouseMoveUp.with_id(id),    |v| v + y.max(0.0));
+                self.modify_val(MouseMoveDown.with_id(id),  |v| v - y.min(0.0));
             },
-            DeviceEvent::MouseWheel { delta } => {
-                let (x, y) = match delta {
-                    MouseScrollDelta::LineDelta(x, y) => (*x, *y),
-                    MouseScrollDelta::PixelDelta(PhysicalPosition { x, y }) => (*x as f32, *y as f32)
-                };
-                let (x, y) = (x * self.scroll_scale, y * self.scroll_scale);
-                
-                self.modify_val(MouseScrollUp.into(), |v| v + y.max(0.0));
-                self.modify_val(MouseScrollDown.into(),   |v| v - y.min(0.0));
-                self.modify_val(MouseScrollLeft.into(), |v| v + x.max(0.0));
-                self.modify_val(MouseScrollRight.into(), |v| v - x.min(0.0));
-            },
+            DeviceEvent::MouseWheel { delta } => self.update_scroll(*delta, id),
              _ => (),
         }
     }
@@ -192,8 +181,9 @@ impl<F: Hash + Eq + Copy> InputMap<F> {
     pub fn update_with_window_event(&mut self, event: &WindowEvent) {
         match event {
             WindowEvent::CursorMoved { position, .. } => self.update_mouse(*position),
-            WindowEvent::MouseInput { state, button, .. } => self.update_buttons(state, *button),
-            WindowEvent::KeyboardInput { event, .. } => self.update_keys(event),
+            WindowEvent::MouseWheel { delta, device_id, .. } => self.update_scroll(*delta, *device_id),
+            WindowEvent::MouseInput { state, button, device_id } => self.update_buttons(state, *device_id, *button),
+            WindowEvent::KeyboardInput { event, device_id, .. } => self.update_keys(*device_id, event),
             _ => ()
         }
     }
@@ -222,29 +212,52 @@ impl<F: Hash + Eq + Copy> InputMap<F> {
         self.text_typed = None;
     }
     #[cfg(feature = "mice-keyboard")]
+    fn update_scroll(&mut self, delta: MouseScrollDelta, id: DeviceId) {
+        use base_input_codes::*;
+        let (x, y) = match delta {
+        MouseScrollDelta::LineDelta(x, y) => (x, y),
+            MouseScrollDelta::PixelDelta(PhysicalPosition { x, y }) => (x as f32, y as f32)
+        };
+        let (x, y) = (x * self.scroll_scale, y * self.scroll_scale);
+        
+        self.modify_val(MouseScrollUp.with_id(id),    |v| v + y.max(0.0));
+        self.modify_val(MouseScrollDown.with_id(id),  |v| v - y.min(0.0));
+        self.modify_val(MouseScrollLeft.with_id(id),  |v| v + x.max(0.0));
+        self.modify_val(MouseScrollRight.with_id(id), |v| v - x.min(0.0));
+    }
+    #[cfg(feature = "mice-keyboard")]
     fn update_mouse(&mut self, position: PhysicalPosition<f64>) {
         self.mouse_pos = v(position.x as f32, position.y as f32);
     }
     #[cfg(feature = "mice-keyboard")]
-    fn update_keys(&mut self, event: &KeyEvent) {
-        let input_code = event.physical_key.into();
+    fn update_keys(&mut self, id: DeviceId, event: &KeyEvent) {
+        let input_code: DeviceInput = event.physical_key.into();
 
         if let (Some(string), Some(new)) = (&mut self.text_typed, &event.text) {
             string.push_str(new);
         } else { self.text_typed = event.text.as_ref().map(|i| i.to_string()) }
 
-        self.update_val(input_code, event.state.is_pressed().into());
+        self.update_val(input_code.with_id(id), event.state.is_pressed().into());
     }
     #[cfg(feature = "mice-keyboard")]
-    fn update_buttons(&mut self, state: &ElementState, button: MouseButton) {
-        let input_code = button.into();
-        self.update_val(input_code, state.is_pressed().into());
+    fn update_buttons(&mut self, state: &ElementState, id: DeviceId, button: MouseButton) {
+        let input_code: DeviceInput = button.into();
+        self.update_val(input_code.with_id(id), state.is_pressed().into());
     }
     /// updates provided input code
     fn update_val(&mut self, input_code: InputCode, val: f32) {
         let pressing = val >= self.press_sensitivity;
-        if pressing { self.recently_pressed = Some(input_code) } 
-        let Some((bind_val, binds)) = self.binds.get(&input_code) else { return };
+        if pressing && !input_code.is_any() { self.recently_pressed = Some(input_code) }
+
+        let Some((bind_val, binds)) = self.binds.get(&input_code) else {
+            if !input_code.is_any() {
+                let any = input_code.set_any(); 
+                if self.binds.contains_key(&any) {
+                    self.modify_any_val(any, |_| val);
+                }
+            }
+            return
+        };
         
         let diff = val - bind_val; // change between current and last val
         for &action in binds {
@@ -258,10 +271,23 @@ impl<F: Hash + Eq + Copy> InputMap<F> {
         }
         
         self.binds.get_mut(&input_code).unwrap().0 = val;
+
+        if !input_code.is_any() {
+            let any = input_code.set_any(); 
+            if self.binds.contains_key(&any) {
+                self.modify_val(any, |v| v + diff);
+            }
+        }
     }
     fn modify_val<FN: Fn(f32) -> f32>(&mut self, input_code: InputCode, f: FN) {
         let Some((bind_val, binds)) = self.binds.get(&input_code) else {
-            if f(0.0) >= self.press_sensitivity { self.recently_pressed = Some(input_code) }
+            if f(0.0) >= self.press_sensitivity && !input_code.is_any() { self.recently_pressed = Some(input_code) }
+            if !input_code.is_any() {
+                let any = input_code.set_any(); 
+                if self.binds.contains_key(&any) {
+                    self.modify_any_val(any, f);
+                }
+            }
             return;
         };
 
@@ -269,7 +295,37 @@ impl<F: Hash + Eq + Copy> InputMap<F> {
         let diff = val - *bind_val;
         for &action in binds {
             let pressing = val >= self.press_sensitivity;
-            if pressing { self.recently_pressed = Some(input_code) }
+            if pressing && !input_code.is_any() { self.recently_pressed = Some(input_code) }
+            
+            let pressed = self.pressing(action);
+            let jpressed = pressing && !pressed;
+            let released = !pressing && pressed;
+
+            let val = self.action_val(action) + diff;
+            self.action_val.insert(action, (val, jpressed, released));
+        }
+        
+        self.binds.get_mut(&input_code).unwrap().0 = val;
+
+        if !input_code.is_any() {
+            let any = input_code.set_any(); 
+            if self.binds.contains_key(&any) {
+                self.modify_any_val(any, |v| v + diff);
+            }
+        }
+    }
+    fn modify_any_val<FN: Fn(f32) -> f32>(&mut self, input_code: InputCode, f: FN) {
+        let Some((bind_val, binds)) = self.binds.get(&input_code) else {
+            if input_code.is_any() { return }
+            if f(0.0) >= self.press_sensitivity && !input_code.is_any() { self.recently_pressed = Some(input_code) }
+            return;
+        };
+
+        let val = f(*bind_val);
+        let diff = val - *bind_val;
+        for &action in binds {
+            let pressing = val >= self.press_sensitivity;
+            if pressing && !input_code.is_any() { self.recently_pressed = Some(input_code) }
             
             let pressed = self.pressing(action);
             let jpressed = pressing && !pressed;
@@ -289,7 +345,6 @@ impl<F: Hash + Eq + Copy> InputMap<F> {
         match event {
             EventType::ButtonChanged(b, v, _) => {
                 let a: GamepadInput = b.into();
-                self.update_val(a.into(), v);
                 self.update_val(a.with_id(id), v);
             },
             EventType::AxisChanged(b, v, _) => {
@@ -298,8 +353,6 @@ impl<F: Hash + Eq + Copy> InputMap<F> {
                 let input_pos = axis_pos(b);
                 let input_neg = axis_neg(b);
 
-                self.update_val(input_pos.into(),      dir_pos);
-                self.update_val(input_neg.into(),      dir_neg);
                 self.update_val(input_pos.with_id(id), dir_pos);
                 self.update_val(input_neg.with_id(id), dir_neg);
             },
@@ -313,7 +366,6 @@ impl<F: Hash + Eq + Copy> InputMap<F> {
                  South, East, North, West, LeftTrigger, LeftTrigger2, RightTrigger,
                  RightTrigger2,  Select, Start, Mode, Other].iter() {
                     self.update_val(i.with_id(id), 0.0);
-                    self.update_val((*i).into(),   0.0);
                  }
             }
             _ => ()

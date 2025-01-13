@@ -20,6 +20,30 @@ impl InputCode {
             Self::Device  { input, .. } => input.into(),
         }
     }
+    pub fn is_any(self) -> bool {
+        match self {
+            #[cfg(feature = "gamepad")]
+            Self::Gamepad { id, .. } => id == SpecifyGamepad::Any,
+            #[cfg(feature = "mice-keyboard")]
+            Self::Device  { id, .. } => id == SpecifyDevice::Any,
+        }
+    }
+    #[cfg(feature = "mice-keyboard")]
+    pub fn has_device_id(&self, id: DeviceId) -> bool {
+        match self {
+            Self::Device { id: SpecifyDevice::Id(cid), .. } => *cid == id,
+            Self::Device { id: SpecifyDevice::Any,     .. } => true,
+            _ => false
+        }
+    }
+    #[cfg(feature = "gamepad")]
+    pub fn has_gamepad_id(&self, id: gilrs::GamepadId) -> bool {
+        match self {
+            Self::Gamepad { id: SpecifyGamepad::Id(cid), .. } => *cid == id,
+            Self::Gamepad { id: SpecifyGamepad::Any,     .. } => true,
+            _ => false
+        }
+    }
     #[cfg(feature = "gamepad")]
     #[allow(irrefutable_let_patterns)]
     /// sets the gamepad id. if its a device it does nothing.
@@ -87,7 +111,7 @@ pub enum DeviceInput {
     MouseScrollUp,
     MouseScrollDown,
     MouseScrollLeft,
-    MouseScrollRight
+    MouseScrollRight,
 }
 #[cfg(feature = "mice-keyboard")]
 impl DeviceInput {

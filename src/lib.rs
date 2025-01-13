@@ -25,7 +25,7 @@
 //! );
 //! let ev = EventLoop::new().unwrap();
 //! let gilrs = Gilrs::new().unwrap();
-//! ev.run_app(&mut App { window: None, input, gilrs}).unwrap();
+//! ev.run_app(&mut App { window: None, input, gilrs }).unwrap();
 //!
 //! struct App {
 //!     window: Option<Window>,
@@ -47,10 +47,10 @@
 //!         { event_loop.exit() }
 //!     }
 //!     fn device_event(
-//!         &mut self, _: &ActiveEventLoop, _: DeviceId,
+//!         &mut self, _: &ActiveEventLoop, id: DeviceId,
 //!         event: DeviceEvent
 //!     ) {
-//!         self.input.update_with_device_event(&event);
+//!         self.input.update_with_device_event(id, &event);
 //!     }
 //!     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
 //!         self.input.update_with_gilrs(&mut self.gilrs);

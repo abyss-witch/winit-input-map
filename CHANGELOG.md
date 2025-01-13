@@ -8,3 +8,9 @@ removed consts and axis to simplify enums
 abstracted gilrs axis and buttons because of overlap
 Made disconecting a gamepad stop its input
 Updated documentation and readme
+
+0.5.0
+fixed mouse scroll sometimes not working
+changed default mouse scale
+fixed multiple devices/gamepads intefearing with any devices/gamepads binds
+fixed specified device input
