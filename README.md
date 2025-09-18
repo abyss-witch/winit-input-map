@@ -2,15 +2,18 @@ An input map for winit!
 
 Winit input map aims to be fully featured, simple to use and easy to read.
 
-It works by assigning each input code to an action, these action will have a variable press weight and functions
-like axis and dir can turn them into .
+It works by assigning each action a series of binds, if any of them are pressed the action is pressed.
+A bind consists of every input code needed to be pressed for the bind to be pressed.
+The input map can get whether an action is being pressed, just pressed, just released or its current value.
 e.g
 ```rust
+use Actions::*;
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
 enum Actions {
     MoveLeft, MoveRight,
     CameraUp, CameraDown,
-    CameraLeft, CameraRight
+    CameraLeft, CameraRight,
+    Undo
 }
 // set up
 // ...
@@ -20,15 +23,17 @@ let mut input = { use base_input_codes::*; input_map!(
     (CameraLeft,  MouseMoveLeft,  RightStickLeft ),
     (CameraRight, MouseMoveRight, RightStickRight),
     (CameraUp,    MouseMoveUp,    RightStickUp   ),
-    (CameraDown,  MouseMoveDown,  RightStickDown )
+    (CameraDown,  MouseMoveDown,  RightStickDown ),
+    (Undo, [ControlLeft, KeyZ], [ControlRight, KeyZ]),
 ) };
 // ...
 
 // gameplay loop
 
-// clamp is there incase it gets bound to scroll or mouse move as they can go above 1
+// clamped as sometimes variable input can go above 1
 player.pos += input.axis(MoveRight, MoveLeft).clamp(-1.0, 1.0);
 camera.pos += input.dir(CameraRight, CameraLeft, CameraUp, CameraDown);
+if input.pressed(Undo) { undo() }
 ```
 
 ## Features:

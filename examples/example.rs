@@ -57,9 +57,7 @@ impl ApplicationHandler for App {
         let scroll = input.axis(ScrollU, ScrollD);
     
         if input.pressed(Debug) {
-            println!("pressed {:?}", input.binds.iter().filter_map(|(a, (_, s))| {
-                if s.contains(&Debug) { Some(*a) } else { None }
-            }).collect::<Vec<InputCode>>())
+            println!("pressed {:?}", input.get_binds().into_iter().find(|&(a, _)| a == Debug).map(|(_, v)| v))
         }
         if input.pressing(Right) || input.pressing(Left) {
             println!("axis: {}", input.axis(Right, Left))
@@ -82,7 +80,7 @@ impl ApplicationHandler for App {
             println!("{other:?}");
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
-        //reset input. use after your done with the input
+        // reset input. use after your done with the input
         input.init();
     }
 }

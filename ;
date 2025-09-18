@@ -1,0 +1,145 @@
+#![cfg_attr(test, feature(test))]
+#![feature(negative_impls)]
+//! Define actions and their input binds and then see if its `pressing`, `pressed` or
+//! `released`. This library handles variable pressure through the `value` function as well as
+//! multiple variable pressure inputs for things like 1d axis (through `axis`) and 2d vectors 
+//! (through `dir` and `dir_max_len_1`). This makes it easy to have things like 3d camera controls
+//! applied for both mouse movement and the gamepads right stick. The input map also can get the
+//! `mouse_pos`, what was `recently_pressed` (used for rebinding things) and the `text_typed`
+//! (useful for typing) to make sure it is fully featured. For better user control there are the
+//! `mouse_scale` and `scroll_scale` variables to make sensitivity align with eveything else
+//! 0-1 range and a `press_sensitivity` to control when a action counts as being pressed. Finaly,
+//! theres an input_map! macro to reduce boilerplate and increase readability.
+//! ```
+//! use winit::{
+//!     window::*, application::*, keyboard::*,
+//!     event_loop::*, event::*
+//! };
+//! use gilrs::Gilrs;
+//! use winit_input_map::*;
+//!
+//! #[derive(Hash, PartialEq, Eq, Clone, Copy)]
+//! enum Actions{ Foo }
+//! use Actions::*;
+//!
+//! let input = { use base_input_codes::*; input_map!(
+//!     (Foo, KeyCode::Space, GamepadInput::South)
+//! ) };
+//! let ev = EventLoop::new().unwrap();
+//! let gilrs = Gilrs::new().unwrap();
+//! ev.run_app(&mut App { window: None, input, gilrs }).unwrap();
+//!
+//! struct App {
+//!     window: Option<Window>,
+//!     input: InputMap<Actions>,
+//!     gilrs: Gilrs
+//! }
+//! impl ApplicationHandler for App {
+//!     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+//!         let window_settings = Window::default_attributes();
+//!         let window = event_loop.create_window(window_settings);
+//!         self.window = Some(window.unwrap());
+//!     }
+//!     fn window_event(
+//!         &mut self, event_loop: &ActiveEventLoop, _: WindowId,
+//!         event: WindowEvent
+//!     ) {
+//!         self.input.update_with_window_event(&event);
+//!         if let WindowEvent::CloseRequested = &event
+//!         { event_loop.exit() }
+//!     }
+//!     fn device_event(
+//!         &mut self, _: &ActiveEventLoop, id: DeviceId,
+//!         event: DeviceEvent
+//!     ) {
+//!         self.input.update_with_device_event(id, &event);
+//!     }
+//!     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
+//!         self.input.update_with_gilrs(&mut self.gilrs);
+//!         
+//!         // your code here!
+//!         if self.input.pressed(Foo) { println!("bar") }
+//!
+//!         self.input.init();
+//!     }
+//! }
+//! ```
+mod input;
+mod input_code;
+pub use crate::input::*;
+pub use crate::input_code::*;
+
+#[macro_export]
+macro_rules! input_map {
+    () => { $crate::InputMap::<()>::empty() };
+    ( $( ( $x: expr, $( $k: expr ),* ) ),* ) => {
+        {
+            use $crate::AsBind;
+            InputMap::new(&[ $(
+                ($x, &[ $( (&$k as &dyn $crate::AsBind).as_bind().as_slice() )*, ])
+            ),* ])
+        }
+    };
+}
+
+pub trait AsInputCode { fn as_code(&self) -> InputCode; }
+impl<T: Into<InputCode> + Copy> AsInputCode for T { fn as_code(&self) -> InputCode { (*self).into() } }
+
+pub trait AsBind { fn as_bind(&self) -> Vec<InputCode>; }
+impl AsBind for dyn Iterator<Item = &dyn AsInputCode> {
+    fn as_bind(&self) -> Vec<InputCode> {
+        let mut clone = self.clone();
+        clone.into_iter().map(|i| i.as_code()).collect()
+    }
+}
+impl<T: AsInputCode> AsBind for T { fn as_bind(&self) -> Vec<InputCode> { vec![self.as_code()] } }
+/*impl AsBind for Vec<&dyn AsInputCode> {
+    fn as_bind(&self) -> Vec<InputCode> {
+        let mut result = Vec::new();
+        for i in self {
+            let bind: InputCode = i.as_code();
+            result.push(bind);
+        }
+        result
+    }
+}
+impl AsBind for &[&dyn AsInputCode] {
+    fn as_bind(&self) -> Vec<InputCode> {
+        let mut result = Vec::new();
+        for i in *self {
+            let bind: InputCode = i.as_code();
+            result.push(bind);
+        }
+        result
+    }
+}
+impl AsBind for [&dyn AsInputCode] {
+    fn as_bind(&self) -> Vec<InputCode> {
+        let mut result = Vec::new();
+        for i in self {
+            let bind: InputCode = i.as_code();
+            result.push(bind);
+        }
+        result
+    }
+}
+impl<const X: usize> AsBind for &[&dyn AsInputCode; X] {
+    fn as_bind(&self) -> Vec<InputCode> {
+        let mut result = Vec::new();
+        for i in *self {
+            let bind: InputCode = i.as_code();
+            result.push(bind);
+        }
+        result
+    }
+}
+impl<const X: usize> AsBind for [&dyn AsInputCode; X] {
+    fn as_bind(&self) -> Vec<InputCode> {
+        let mut result = Vec::new();
+        for i in self {
+            let bind: InputCode = i.as_code();
+            result.push(bind);
+        }
+        result
+    }
+}*/

@@ -151,8 +151,6 @@ pub enum SpecifyDevice {
     #[default]
     Any
 }
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub enum AxisSign { Pos, Neg }
 #[cfg(feature = "gamepad")]
 pub use gamepad::*;
 #[cfg(feature = "gamepad")]
@@ -188,10 +186,10 @@ mod gamepad {
         North,
         West,
 
+        LeftBumper,
         LeftTrigger,
-        LeftTrigger2,
+        RightBumper,
         RightTrigger,
-        RightTrigger2,
 
         Select,
         Start,
@@ -209,26 +207,26 @@ mod gamepad {
     }
     pub fn axis_neg(axis: Axis) -> GamepadInput {
         match axis {
-            Axis::LeftStickX => GamepadInput::LeftStickRight,
+            Axis::LeftStickX => GamepadInput::LeftStickLeft,
             Axis::LeftStickY => GamepadInput::LeftStickDown,
-            Axis::RightStickX => GamepadInput::RightStickRight,
+            Axis::RightStickX => GamepadInput::RightStickLeft,
             Axis::RightStickY => GamepadInput::RightStickDown,
             Axis::LeftZ => GamepadInput::LeftZ,
             Axis::RightZ => GamepadInput::RightZ,
-            Axis::DPadX => GamepadInput::DPadRight,
+            Axis::DPadX => GamepadInput::DPadLeft,
             Axis::DPadY => GamepadInput::DPadDown,
             Axis::Unknown => GamepadInput::Other
         }
     }
     pub fn axis_pos(axis: Axis) -> GamepadInput {
         match axis {
-            Axis::LeftStickX => GamepadInput::LeftStickLeft,
+            Axis::LeftStickX => GamepadInput::LeftStickRight,
             Axis::LeftStickY => GamepadInput::LeftStickUp,
-            Axis::RightStickX => GamepadInput::RightStickLeft,
+            Axis::RightStickX => GamepadInput::RightStickRight,
             Axis::RightStickY => GamepadInput::RightStickUp,
             Axis::LeftZ => GamepadInput::LeftZ,
             Axis::RightZ => GamepadInput::RightZ,
-            Axis::DPadX => GamepadInput::DPadLeft,
+            Axis::DPadX => GamepadInput::DPadRight,
             Axis::DPadY => GamepadInput::DPadUp,
             Axis::Unknown => GamepadInput::Other,
         }
@@ -240,10 +238,10 @@ mod gamepad {
                 Button::East => GamepadInput::East,
                 Button::North => GamepadInput::North,
                 Button::West => GamepadInput::West,
-                Button::LeftTrigger => GamepadInput::LeftTrigger,
-                Button::LeftTrigger2 => GamepadInput::LeftTrigger2,
-                Button::RightTrigger2 => GamepadInput::RightTrigger2,
-                Button::RightTrigger => GamepadInput::RightTrigger,
+                Button::LeftTrigger => GamepadInput::LeftBumper,
+                Button::LeftTrigger2 => GamepadInput::LeftTrigger,
+                Button::RightTrigger2 => GamepadInput::RightTrigger,
+                Button::RightTrigger => GamepadInput::RightBumper,
                 Button::DPadUp => GamepadInput::DPadUp,
                 Button::DPadDown => GamepadInput::DPadDown,
                 Button::DPadLeft => GamepadInput::DPadLeft,
