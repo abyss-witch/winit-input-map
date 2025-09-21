@@ -98,11 +98,9 @@ pub use crate::input_code::*;
 #[macro_export]
 macro_rules! input_map {
     () => { $crate::InputMap::empty() };
-    ( $( ( $x: expr, $( $k: expr ),* ) ),* ) => {
+    ( $( $t: tt )* ) => {
         $crate::InputMap::new(
-            &$crate::binds!($(
-                ($x, $( $k ),* )
-            ),*)
+            &$crate::binds!($($t)*)
         )
     };
 }
@@ -125,7 +123,7 @@ macro_rules! input_map {
 ///
 /// let binds = { use base_input_codes::*; binds!(
 ///     (Select, MouseButton::Left, ShiftRight),
-///     (Action::Undo,  [KeyZ, ControlLeft], [KeyZ, ControlRight]),
+///     (Action::Undo,  [KeyZ, ControlLeft], [KeyZ, ControlRight], KeyCode::Undo),
 ///     (Redo,  [KeyR, ControlLeft], [KeyR, ControlRight]),
 ///     (Confirm, MouseButton::Left, Enter)
 /// ) };
@@ -134,109 +132,42 @@ macro_rules! input_map {
 /// ```
 #[macro_export]
 macro_rules! binds {
-    ( $( ( $x: expr, $( $k: expr ),* ) ),* ) => { {
-        $crate::as_binds(&[ $(
-                ($x, &[ $( (&$k as &dyn $crate::AsBind) ),* ])
-        ),* ])
+    ( $( ( $x: expr, $( $tail: tt )* ) ),* ) => { {
+        vec![ $(
+                ($x, $crate::binds_muncher!(vec![]; $( $tail )*))
+        ),* ]
     } };
 }
-/// Takes in more flexible deffinition of binds, the `binds!` macro is however, still prefered.
-pub fn as_binds<'a, F: std::hash::Hash + Copy>(binds: &'a [(F, &'a [&'a dyn AsBind])]) -> crate::Binds<F> {
-    let mut result = Vec::new();
-    for (action, binds) in binds {
-        let mut sub_result = Vec::new();
-        for bind in *binds {
-            sub_result.push(bind.as_bind());
-        }
-        result.push((*action, sub_result));
-    }
-    result
-}
 
-trait AsInputCode { fn as_code(&self) -> InputCode; }
-impl<T: Into<InputCode> + Copy> AsInputCode for T { fn as_code(&self) -> InputCode { (*self).into() } }
-
-/// Dictates what can be turned into binds for the purposes of the `as_binds()` method and the
-/// `binds!()` and `input_map!()` macros
-pub trait AsBind { fn as_bind(&self) -> Vec<InputCode>; }
-impl<T: AsInputCode> AsBind for T { fn as_bind(&self) -> Vec<InputCode> { vec![self.as_code()] } }
-impl<T: AsInputCode, const X: usize> AsBind for [T; X] { 
-    fn as_bind(&self) -> Vec<InputCode> {
-        let mut result = Vec::new();
-        for i in self {
-            let bind: InputCode = i.as_code();
-            result.push(bind);
-        }
-        result
-    }
+#[test]
+fn bind_muncher() {
+    use base_input_codes::*;
+    assert_eq!(
+        vec![vec![InputCode::from(KeyZ)], vec![MouseButton::Left.into(), ShiftLeft.into()], vec![KeyZ.into(), KeyI.into(), KeyF.into()]],
+        *binds_muncher!(vec![]; KeyZ, [MouseButton::Left, ShiftLeft], [KeyZ, KeyI, KeyF])
+    );
 }
-impl<T: AsInputCode> AsBind for [T] { 
-    fn as_bind(&self) -> Vec<InputCode> {
-        let mut result = Vec::new();
-        for i in self {
-            let bind: InputCode = i.as_code();
-            result.push(bind);
-        }
-        result
-    }
-}
-impl<T: AsInputCode> AsBind for &[T] { 
-fn as_bind(&self) -> Vec<InputCode> {
-    let mut result = Vec::new();
-    for i in *self {
-        let bind: InputCode = i.as_code();
-        result.push(bind);
-    }
-    result
-}
-}
-impl AsBind for Vec<&dyn AsInputCode> {
-    fn as_bind(&self) -> Vec<InputCode> {
-        let mut result = Vec::new();
-        for i in self {
-            let bind: InputCode = i.as_code();
-            result.push(bind);
-        }
-        result
-    }
-}
-impl AsBind for &[&dyn AsInputCode] {
-    fn as_bind(&self) -> Vec<InputCode> {
-        let mut result = Vec::new();
-        for i in *self {
-            let bind: InputCode = i.as_code();
-            result.push(bind);
-        }
-        result
-    }
-}
-impl AsBind for [&dyn AsInputCode] {
-    fn as_bind(&self) -> Vec<InputCode> {
-        let mut result = Vec::new();
-        for i in self {
-            let bind: InputCode = i.as_code();
-            result.push(bind);
-        }
-        result
-    }
-}
-impl<const X: usize> AsBind for &[&dyn AsInputCode; X] {
-    fn as_bind(&self) -> Vec<InputCode> {
-        let mut result = Vec::new();
-        for i in *self {
-            let bind: InputCode = i.as_code();
-            result.push(bind);
-        }
-        result
-    }
-}
-impl<const X: usize> AsBind for [&dyn AsInputCode; X] {
-    fn as_bind(&self) -> Vec<InputCode> {
-        let mut result = Vec::new();
-        for i in self {
-            let bind: InputCode = i.as_code();
-            result.push(bind);
-        }
-        result
-    }
+#[macro_export]
+macro_rules! binds_muncher {
+    ( @vec $v: expr; ) => { $v };
+    ( $v: expr; [ $( $x: expr ),* ] ) => { {
+        let mut v: Vec<Vec<InputCode>> = $v;
+        v.push(vec![$( InputCode::from($x) ),*]);
+        v
+    } };
+    ( $v: expr; $x: expr ) => { {
+        let mut v: Vec<Vec<InputCode>> = $v;
+        v.push(vec![InputCode::from($x)]);
+        v
+    } };
+    ( $v: expr; [ $( $x: expr ),* ], $( $tail: tt )* ) => { {
+        let mut v: Vec<Vec<InputCode>> = $v;
+        v.push(vec![$( InputCode::from($x) ),*]);
+        $crate::binds_muncher!(v; $($tail)*)
+    } };
+    ( $v: expr; $x: expr, $( $tail: tt )* ) => { {
+        let mut v: Vec<Vec<InputCode>> = $v;
+        v.push(vec![InputCode::from($x)]);
+        $crate::binds_muncher!(v; $($tail)*)
+    } };
 }

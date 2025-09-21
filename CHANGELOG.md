@@ -25,3 +25,7 @@ removed unused AxisSign enum
 added `set_binds`, `add_binds` and `get_binds`
 removed `get_mut_binds`
 fixed gamepad input from being detected while the window is unfoccused so its consistant with keyboard input
+
+0.6.1
+fixed input! and binds! macros
+changed base_input_codes to important more

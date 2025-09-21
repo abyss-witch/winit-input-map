@@ -1,14 +1,14 @@
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
-enum Actions {
+enum Action {
     Debug,
-    Left,
-    Right,
+    Left, Right,
     Click,
     MouseR, MouseL, MouseU, MouseD,
-    ScrollU, ScrollD
+    ScrollU, ScrollD,
+    Undo
 }
 use winit_input_map::*;
-use Actions::*;
+use Action::*;
 use gilrs::Gilrs;
 use winit::{event::*, application::*, window::*, event_loop::*};
 fn main() {
@@ -22,7 +22,9 @@ fn main() {
         (MouseU, MouseMoveUp,    RightStickUp   ),
         (MouseD, MouseMoveDown,  RightStickDown ),
         (ScrollU, Equal, MouseScrollUp  ),
-        (ScrollD, Minus, MouseScrollDown)
+        (ScrollD, Minus, MouseScrollDown),
+        // square brackets mean all input codes must be pressed for the bind to be pressed
+        (Action::Undo, [ControlLeft, KeyZ], [ControlRight, KeyZ])
     ) };
     input.mouse_scale = 1.0;
     input.scroll_scale = 1.0;
@@ -31,7 +33,7 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.run_app(&mut App { window: None, input, gilrs }).unwrap();
 }
-struct App { window: Option<Window>, input: InputMap<Actions>, gilrs: Gilrs }
+struct App { window: Option<Window>, input: InputMap<Action>, gilrs: Gilrs }
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_settings = Window::default_attributes();
@@ -70,9 +72,10 @@ impl ApplicationHandler for App {
                 mouse_move, input.mouse_pos
             )
         }
-        if input.released(Click) {
-            println!("released")
-        }
+        if input.released(Click) { println!("released") }
+
+        if input.pressed(Undo) { println!("Undone") }
+
         if scroll != 0.0 {
             println!("scrolling {}", scroll);
         }

@@ -1,7 +1,3 @@
-#[cfg(feature = "mice-keyboard")]
-use winit::keyboard::{ KeyCode, PhysicalKey };
-#[cfg(feature = "mice-keyboard")]
-use winit::event::*;
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 /// Enum that specifies an input
 pub enum InputCode {
@@ -29,7 +25,7 @@ impl InputCode {
         }
     }
     #[cfg(feature = "mice-keyboard")]
-    pub fn has_device_id(&self, id: DeviceId) -> bool {
+    pub fn has_device_id(&self, id: winit::event::DeviceId) -> bool {
         match self {
             Self::Device { id: SpecifyDevice::Id(cid), .. } => *cid == id,
             Self::Device { id: SpecifyDevice::Any,     .. } => true,
@@ -54,33 +50,9 @@ impl InputCode {
     #[cfg(feature = "mice-keyboard")]
     #[allow(irrefutable_let_patterns)]
     /// sets the device id. if its a gamepad it does nothing.
-    pub fn set_device_id(self, id: DeviceId) -> Self {
+    pub fn set_device_id(self, id: winit::event::DeviceId) -> Self {
         if let Self::Device { input, .. } = self { input.with_id(id) }
         else { self }
-    }
-}
-#[cfg(feature = "mice-keyboard")]
-impl From<DeviceInput> for InputCode {
-    fn from(value: DeviceInput) -> Self {
-        Self::Device { id: SpecifyDevice::Any, input: value }
-    }
-}
-#[cfg(feature = "mice-keyboard")]
-impl From<MouseButton> for InputCode {
-    fn from(value: MouseButton) -> Self {
-        Self::Device { id: SpecifyDevice::Any, input: value.into() }
-    }
-}
-#[cfg(feature = "mice-keyboard")]
-impl From<PhysicalKey> for InputCode {
-    fn from(value: PhysicalKey) -> Self {
-        Self::Device { id: SpecifyDevice::Any, input: value.into() }
-    }
-}
-#[cfg(feature = "mice-keyboard")]
-impl From<KeyCode> for InputCode {
-    fn from(value: KeyCode) -> Self {
-        Self::Device { id: SpecifyDevice::Any, input: value.into() }
     }
 }
 /// imports everything needed to reduce boilerplate when creating an input_map
@@ -89,68 +61,100 @@ pub mod base_input_codes {
     use crate::input_code::*;
 
     #[cfg(feature = "gamepad")]
-    pub use GamepadInput::*;
+    pub use gamepad::GamepadInput::{*, self};
+
     #[cfg(feature = "mice-keyboard")]
-    pub use DeviceInput::*;
+    pub use mice_keyboard::DeviceInput::{*, self};
 
     #[cfg(feature = "mice-keyboard")]
     pub use winit::{
-        keyboard::{KeyCode::*, PhysicalKey::*},
+        keyboard::{KeyCode::{*, self}, PhysicalKey::{*, self}},
         event::MouseButton
     };
 }
+
 #[cfg(feature = "mice-keyboard")]
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub enum DeviceInput {
-    Button(MouseButton),
-    Key(PhysicalKey),
-    MouseMoveLeft,
-    MouseMoveRight,
-    MouseMoveUp,
-    MouseMoveDown,
-    MouseScrollUp,
-    MouseScrollDown,
-    MouseScrollLeft,
-    MouseScrollRight,
-}
+pub use mice_keyboard::*;
 #[cfg(feature = "mice-keyboard")]
-impl DeviceInput {
-    pub fn with_id(self, id: DeviceId) -> InputCode {
-        InputCode::Device { id: SpecifyDevice::Id(id), input: self }
+mod mice_keyboard {
+    use winit::keyboard::{ KeyCode, PhysicalKey };
+    use winit::event::*;
+    use crate::InputCode;
+    #[cfg(feature = "mice-keyboard")]
+    #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+    pub enum DeviceInput {
+        Button(MouseButton),
+        Key(PhysicalKey),
+        MouseMoveLeft,
+        MouseMoveRight,
+        MouseMoveUp,
+        MouseMoveDown,
+        MouseScrollUp,
+        MouseScrollDown,
+        MouseScrollLeft,
+        MouseScrollRight,
     }
-    pub fn with_sid(self, id: SpecifyDevice) -> InputCode {
-        InputCode::Device { id, input: self }
+    #[cfg(feature = "mice-keyboard")]
+    impl DeviceInput {
+        pub fn with_id(self, id: DeviceId) -> InputCode {
+            InputCode::Device { id: SpecifyDevice::Id(id), input: self }
+        }
+        pub fn with_sid(self, id: SpecifyDevice) -> InputCode {
+            InputCode::Device { id, input: self }
+        }
+    }
+    #[cfg(feature = "mice-keyboard")]
+    impl From<MouseButton> for DeviceInput {
+        fn from(value: MouseButton) -> Self {
+            Self::Button(value) 
+        }
+    }
+    #[cfg(feature = "mice-keyboard")]
+    impl From<KeyCode> for DeviceInput {
+        fn from(value: KeyCode) -> Self {
+            Self::Key(value.into()) 
+        }
+    }
+    #[cfg(feature = "mice-keyboard")]
+    impl From<PhysicalKey> for DeviceInput {
+        fn from(value: PhysicalKey) -> Self {
+            Self::Key(value)
+        }
+    }
+    /// specify device to listen to. defaults to any and can be specified later on at runtime
+    #[cfg(feature = "mice-keyboard")]
+    #[derive(Default, Debug, PartialEq, Eq, Clone, Copy, Hash)]
+    pub enum SpecifyDevice {
+        /// cant be set at compile time. use `Any` as default and then let the user select a specific
+        /// gamepad at runtime
+        Id(DeviceId),
+        /// use as default
+        #[default]
+        Any
+    }
+    impl From<DeviceInput> for InputCode {
+        fn from(value: DeviceInput) -> Self {
+            Self::Device { id: SpecifyDevice::Any, input: value }
+        }
+    }
+    impl From<MouseButton> for InputCode {
+        fn from(value: MouseButton) -> Self {
+            Self::Device { id: SpecifyDevice::Any, input: value.into() }
+        }
+    }
+    impl From<PhysicalKey> for InputCode {
+        fn from(value: PhysicalKey) -> Self {
+            Self::Device { id: SpecifyDevice::Any, input: value.into() }
+        }
+    }
+    impl From<KeyCode> for InputCode {
+        fn from(value: KeyCode) -> Self {
+            Self::Device { id: SpecifyDevice::Any, input: value.into() }
+        }
     }
 }
-#[cfg(feature = "mice-keyboard")]
-impl From<MouseButton> for DeviceInput {
-    fn from(value: MouseButton) -> Self {
-        Self::Button(value) 
-    }
-}
-#[cfg(feature = "mice-keyboard")]
-impl From<KeyCode> for DeviceInput {
-    fn from(value: KeyCode) -> Self {
-        Self::Key(value.into()) 
-    }
-}
-#[cfg(feature = "mice-keyboard")]
-impl From<PhysicalKey> for DeviceInput {
-    fn from(value: PhysicalKey) -> Self {
-        Self::Key(value)
-    }
-}
-/// specify device to listen to. defaults to any and can be specified later on at runtime
-#[cfg(feature = "mice-keyboard")]
-#[derive(Default, Debug, PartialEq, Eq, Clone, Copy, Hash)]
-pub enum SpecifyDevice {
-    /// cant be set at compile time. use `Any` as default and then let the user select a specific
-    /// gamepad at runtime
-    Id(DeviceId),
-    /// use as default
-    #[default]
-    Any
-}
+
+
 #[cfg(feature = "gamepad")]
 pub use gamepad::*;
 #[cfg(feature = "gamepad")]
