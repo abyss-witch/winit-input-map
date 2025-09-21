@@ -1,6 +1,6 @@
 [package]
 name = "winit-input-map"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 description = "Input Map for Winit with gamepad support"
 license = "Apache-2.0 OR MIT"

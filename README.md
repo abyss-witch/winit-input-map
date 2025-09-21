@@ -24,6 +24,8 @@ let mut input = { use base_input_codes::*; input_map!(
     (CameraRight, MouseMoveRight, RightStickRight),
     (CameraUp,    MouseMoveUp,    RightStickUp   ),
     (CameraDown,  MouseMoveDown,  RightStickDown ),
+    // square brackets indicates that all input codes
+    // must be pressed for the bind to be pressed
     (Undo, [ControlLeft, KeyZ], [ControlRight, KeyZ]),
 ) };
 // ...
